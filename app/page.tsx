@@ -5,30 +5,38 @@ import {
   Activity, AlertTriangle, Archive, ArrowUpRight, Bell, BookOpen, CheckCircle2, ChevronDown,
   ClipboardCheck, Clock3, FileCheck2, FolderKanban, Gauge, Inbox, LayoutDashboard,
   MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, UploadCloud, Users,
-  CreditCard, Building2, LifeBuoy, X, FileText, Download, UserPlus, Zap, Check, RefreshCw
+  CreditCard, Building2, LifeBuoy, X, FileText, Download, UserPlus, Zap, Check, RefreshCw, WalletCards
 } from 'lucide-react'
-import { api, CaseItem, EvidenceItem, ValidationFinding, DecisionItem, AuditEventItem, AnalyticsDashboard, TeamMember, BillingSummary } from '@/lib/api'
+import { api, ApiSessionProfile, CaseItem, EvidenceItem, ValidationFinding, DecisionItem, AuditEventItem, AnalyticsDashboard, TeamMember, BillingSummary, AdapterStatus } from '@/lib/api'
+import { IntegrationsView } from '@/components/IntegrationsView'
+import { GoldLoanStationView } from '@/components/GoldLoanStationView'
+import { VaultServicingView } from '@/components/VaultServicingView'
+import { PaymentsView } from '@/components/PaymentsView'
 
 const nav = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'My cases', icon: FolderKanban, count: '24' },
   { label: 'Evidence inbox', icon: Inbox, count: '8' },
+  { label: 'Gold Loan LOS', icon: Zap },
+  { label: 'Vault & Servicing', icon: ShieldCheck },
+  { label: 'Payments', icon: WalletCards },
   { label: 'Team workspace', icon: Users },
   { label: 'Billing & plan', icon: CreditCard },
 ]
 const controlNav = [
   { label: 'Audit history', icon: Archive },
   { label: 'Search & export', icon: BookOpen },
+  { label: 'Integrations & settings', icon: SlidersHorizontal },
   { label: 'System health', icon: Gauge },
   { label: 'Settings', icon: Settings2 },
 ]
 
 // Baseline fallback data for instantaneous render before API hydrates
 const initialCases: CaseItem[] = [
-  { id: '1', tenant_id: 't1', case_number: 'AUR-2026-01842', customer_name: 'Northbridge Equipment Ltd', product_type: 'Asset finance', requested_amount: 250000, tenure_months: 12, status: 'IN_VALIDATION', priority: 'MEDIUM', owner_name: 'M. Chen', owner_initials: 'MC', sla_hours: 48, created_at: new Date(Date.now() - 7200000).toISOString(), updated_at: new Date(Date.now() - 7200000).toISOString(), files_count: 12 },
-  { id: '2', tenant_id: 't1', case_number: 'AUR-2026-01839', customer_name: 'Lattice Works GmbH', product_type: 'Commercial lending', requested_amount: 420000, tenure_months: 24, status: 'READY_FOR_REVIEW', priority: 'HIGH', owner_name: 'S. Patel', owner_initials: 'SP', sla_hours: 48, created_at: new Date(Date.now() - 18000000).toISOString(), updated_at: new Date(Date.now() - 18000000).toISOString(), files_count: 18 },
-  { id: '3', tenant_id: 't1', case_number: 'AUR-2026-01837', customer_name: 'Meridian Field Services', product_type: 'Instrument-backed', requested_amount: 180000, tenure_months: 6, status: 'EXCEPTION_RAISED', priority: 'URGENT', owner_name: 'A. Rossi', owner_initials: 'AR', sla_hours: 24, created_at: new Date(Date.now() - 97200000).toISOString(), updated_at: new Date(Date.now() - 97200000).toISOString(), files_count: 9 },
-  { id: '4', tenant_id: 't1', case_number: 'AUR-2026-01831', customer_name: 'Harborline Logistics', product_type: 'Asset finance', requested_amount: 310000, tenure_months: 18, status: 'AWAITING_EVIDENCE', priority: 'LOW', owner_name: 'J. Okafor', owner_initials: 'JO', sla_hours: 72, created_at: new Date(Date.now() - 111600000).toISOString(), updated_at: new Date(Date.now() - 111600000).toISOString(), files_count: 6 },
+  { id: '1', tenant_id: 't1', case_number: 'AUR-2026-01842', customer_name: 'Northbridge Equipment Ltd', product_type: 'Asset finance', requested_amount: 250000, tenure_months: 12, status: 'IN_VALIDATION', priority: 'MEDIUM', owner_name: 'M. Chen', owner_initials: 'MC', sla_hours: 48, created_at: '2026-10-15T09:50:00.000Z', updated_at: '2026-10-15T09:50:00.000Z', files_count: 12 },
+  { id: '2', tenant_id: 't1', case_number: 'AUR-2026-01839', customer_name: 'Lattice Works GmbH', product_type: 'Commercial lending', requested_amount: 420000, tenure_months: 24, status: 'READY_FOR_REVIEW', priority: 'HIGH', owner_name: 'S. Patel', owner_initials: 'SP', sla_hours: 48, created_at: '2026-10-15T06:20:00.000Z', updated_at: '2026-10-15T06:20:00.000Z', files_count: 18 },
+  { id: '3', tenant_id: 't1', case_number: 'AUR-2026-01837', customer_name: 'Meridian Field Services', product_type: 'Instrument-backed', requested_amount: 180000, tenure_months: 6, status: 'EXCEPTION_RAISED', priority: 'URGENT', owner_name: 'A. Rossi', owner_initials: 'AR', sla_hours: 24, created_at: '2026-10-14T08:20:00.000Z', updated_at: '2026-10-14T08:20:00.000Z', files_count: 9 },
+  { id: '4', tenant_id: 't1', case_number: 'AUR-2026-01831', customer_name: 'Harborline Logistics', product_type: 'Asset finance', requested_amount: 310000, tenure_months: 18, status: 'AWAITING_EVIDENCE', priority: 'LOW', owner_name: 'J. Okafor', owner_initials: 'JO', sla_hours: 72, created_at: '2026-10-14T03:20:00.000Z', updated_at: '2026-10-14T03:20:00.000Z', files_count: 6 },
 ]
 
 function getTone(status: string): string {
@@ -67,37 +75,53 @@ function getDisplayStatus(status: string): string {
   }
 }
 
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC'
+  }).format(new Date(value))
+}
+
 function Status({ tone, children }: { tone: string; children: string }) {
   return <span className={`status ${tone}`}><span />{children}</span>
 }
 
-function Sparkline({ color, values }: { color: string; values: number[] }) {
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = max - min || 1
-  const width = 120
-  const height = 26
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * width
-    const y = height - ((v - min) / range) * (height - 6) - 3
-    return `${x},${y}`
-  }).join(' ')
-
+function MetricBar({ color, value, label }: { color: string; value: number; label: string }) {
+  const percentage = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0
+  const width = 136 * percentage / 100
   return (
-    <svg className="spark-svg" viewBox={`0 0 ${width} ${height}`}>
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
+    <div className="kpi-chart" role="img" aria-label={`${label}: ${percentage.toFixed(1)} percent`}>
+      <svg viewBox="0 0 144 16" preserveAspectRatio="none" aria-hidden="true">
+        <line className="kpi-chart-track" x1="4" y1="8" x2="140" y2="8" />
+        {[38, 72, 106].map(x => <line className="kpi-chart-tick" key={x} x1={x} y1="4" x2={x} y2="12" />)}
+        <line x1="4" y1="8" x2={4 + width} y2="8" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {percentage > 0 && <circle cx={4 + width} cy="8" r="3" fill={color} />}
+      </svg>
+      <span>{percentage.toFixed(0)}%</span>
+    </div>
   )
 }
 
-function Stat({ icon: Icon, tone, label, value, note, sparkColor, sparkValues }: any) {
+function Stat({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  note,
+  chartColor,
+  chartValue,
+  chartLabel,
+}: {
+  icon: typeof FolderKanban
+  tone: string
+  label: string
+  value: number
+  note: string
+  chartColor: string
+  chartValue: number
+  chartLabel: string
+}) {
   return (
     <div className="stat-card">
       <div className={`stat-icon ${tone}`}><Icon size={18} /></div>
@@ -105,7 +129,7 @@ function Stat({ icon: Icon, tone, label, value, note, sparkColor, sparkValues }:
         <span>{label}</span>
         <strong>{value}</strong>
         <small>{note}</small>
-        {sparkValues && <Sparkline color={sparkColor} values={sparkValues} />}
+        <MetricBar color={chartColor} value={chartValue} label={chartLabel} />
       </div>
       <ArrowUpRight className="stat-arrow" size={16} />
     </div>
@@ -126,6 +150,8 @@ export default function Page() {
   } | null>(null)
 
   const [toast, setToast] = useState('')
+  const [hasApiSession, setHasApiSession] = useState(false)
+  const [sessionProfile, setSessionProfile] = useState<ApiSessionProfile | null>(null)
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
@@ -138,6 +164,7 @@ export default function Page() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [billing, setBilling] = useState<BillingSummary | null>(null)
   const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>([])
+  const [adapters, setAdapters] = useState<AdapterStatus[]>([])
   const [auditVerified, setAuditVerified] = useState<boolean>(true)
   const [decisionNotes, setDecisionNotes] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -146,28 +173,37 @@ export default function Page() {
   // Hydrate from Python API
   const refreshData = async () => {
     try {
-      const [casesRes, analyticsRes, evidenceRes, teamRes, billingRes, auditRes] = await Promise.all([
+      const [casesRes, analyticsRes, evidenceRes, teamRes, billingRes, auditRes, integrationsRes] = await Promise.all([
         api.getCases().catch(() => initialCases),
         api.getAnalytics().catch(() => null),
         api.getEvidence().catch(() => []),
         api.getTeam().catch(() => []),
         api.getBilling().catch(() => null),
         api.getAuditLog(20).catch(() => []),
+        api.getIntegrations().catch(() => ({ adapters: [], environment: 'development', production_enabled: false })),
       ])
-      if (casesRes && casesRes.length > 0) setCaseList(casesRes)
+      if (casesRes) setCaseList(casesRes)
       if (analyticsRes) setAnalytics(analyticsRes)
       if (evidenceRes) setEvidenceList(evidenceRes)
       if (teamRes && teamRes.length > 0) setTeamMembers(teamRes)
       if (billingRes) setBilling(billingRes)
       if (auditRes) setAuditEvents(auditRes)
+      if (integrationsRes?.adapters) setAdapters(integrationsRes.adapters)
     } catch (e) {
       console.warn('API sync using fallback defaults:', e)
     }
   }
 
   useEffect(() => {
+    setHasApiSession(api.hasAccessToken())
+    setSessionProfile(api.getSessionProfile())
     refreshData()
   }, [])
+
+  function openCreateCase() {
+    setSelectedFile(null)
+    setShowCreate(true)
+  }
 
   // Open Case Details Drawer
   const openCaseDetails = async (id: string) => {
@@ -191,15 +227,24 @@ export default function Page() {
   // Submit new case
   async function submitCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (active === 'Gold Loan LOS' && !hasApiSession) {
+      setToast('Sign in before creating a gold-loan intake record.')
+      return
+    }
     setCreating(true)
     const data = new FormData(event.currentTarget)
+    const isGoldLoan = active === 'Gold Loan LOS'
+    const goldCollateral = isGoldLoan
+      ? `Gold collateral: ${String(data.get('goldItemType'))}; gross weight ${Number(data.get('goldWeightGrams'))} g; stated fineness ${Number(data.get('goldPurity'))} bps.`
+      : ''
+    const purpose = [goldCollateral, String(data.get('purpose') || '')].filter(Boolean).join(' ')
     try {
       const newCase = await api.createCase({
         customer_name: String(data.get('customerName')),
         requested_amount: Number(data.get('requestedAmount')),
         tenure_months: Number(data.get('tenureMonths')),
-        purpose: String(data.get('purpose') || ''),
-        product_type: 'Asset finance'
+        purpose,
+        product_type: isGoldLoan ? 'Gold Loan' : 'Asset finance'
       })
 
       // If user selected a file during creation, upload it to the newly created case
@@ -326,25 +371,59 @@ export default function Page() {
   }
 
   // Stats derived from live analytics
-  const kpis = analytics?.kpis || {
-    open_cases: 24,
-    pending_validation: 8,
-    awaiting_decision: 5,
-    open_exceptions: 3,
-    total_cases: 24,
-    sla_compliance_rate: 96.2,
-    validation_pass_rate: 94.5,
-    avg_processing_hours: 3.4
-  }
+  const caseWorkflow = caseList.reduce((workflow, item) => {
+    if (item.status === 'IN_VALIDATION') workflow.in_progress += 1
+    else if (item.status === 'READY_FOR_REVIEW') workflow.ready_for_review += 1
+    else if (item.status === 'AWAITING_EVIDENCE') workflow.awaiting_evidence += 1
+    else if (item.status === 'APPROVED') workflow.approved += 1
+    else if (item.status === 'REJECTED') workflow.rejected += 1
+    else if (item.status === 'EXCEPTION_RAISED') workflow.exceptions += 1
+    return workflow
+  }, {
+    in_progress: 0,
+    ready_for_review: 0,
+    awaiting_evidence: 0,
+    approved: 0,
+    rejected: 0,
+    exceptions: 0,
+  })
+  const analyticsHasWorkflowData = Object.values(analytics?.workflow ?? {}).some(value => value > 0)
+  const kpis = analytics && analytics.kpis.total_cases > 0
+    ? analytics.kpis
+    : {
+        open_cases: caseList.filter(item => !['APPROVED', 'REJECTED'].includes(item.status)).length,
+        pending_validation: caseWorkflow.in_progress,
+        awaiting_decision: caseWorkflow.ready_for_review,
+        open_exceptions: caseWorkflow.exceptions,
+        total_cases: caseList.length,
+        sla_compliance_rate: 0,
+        validation_pass_rate: 0,
+        avg_processing_hours: 0,
+        active_filters_count: 0,
+      }
+  const workflowDist = analyticsHasWorkflowData && analytics ? analytics.workflow : caseWorkflow
 
-  const workflowDist = analytics?.workflow || {
-    in_progress: 11,
-    ready_for_review: 6,
-    awaiting_evidence: 4,
-    approved: 2,
-    rejected: 1,
-    exceptions: 3
-  }
+  const workflowSegments = [
+    { label: 'In progress', value: workflowDist.in_progress, color: '#4a82f4' },
+    { label: 'Ready for review', value: workflowDist.ready_for_review, color: '#2aaf7f' },
+    { label: 'Awaiting evidence', value: workflowDist.awaiting_evidence, color: '#e8a527' },
+    { label: 'Approved', value: workflowDist.approved, color: '#dfe5ed' },
+    { label: 'Rejected', value: workflowDist.rejected, color: '#df5b67' },
+    { label: 'Exceptions', value: workflowDist.exceptions, color: '#7755cf' },
+  ]
+  const workflowTotal = workflowSegments.reduce((total, segment) => total + segment.value, 0)
+  let workflowOffset = 0
+  const workflowGradient = workflowTotal > 0
+    ? `conic-gradient(${workflowSegments.map(segment => {
+      const start = workflowOffset
+      workflowOffset += segment.value / workflowTotal * 100
+      return `${segment.color} ${start}% ${workflowOffset}%`
+    }).join(', ')})`
+    : '#dfe5ed'
+  const openCasesShare = kpis.total_cases > 0 ? kpis.open_cases / kpis.total_cases * 100 : 0
+  const pendingValidationShare = kpis.open_cases > 0 ? kpis.pending_validation / kpis.open_cases * 100 : 0
+  const awaitingDecisionShare = kpis.open_cases > 0 ? kpis.awaiting_decision / kpis.open_cases * 100 : 0
+  const openExceptionsShare = kpis.open_cases > 0 ? kpis.open_exceptions / kpis.open_cases * 100 : 0
 
   return (
     <div className="app-shell">
@@ -353,14 +432,14 @@ export default function Page() {
         <div className="brand">
           <div className="brand-mark">A</div>
           <div>
-            <strong>AURA</strong>
+            <strong>AURUM</strong>
             <span>Customer workspace</span>
           </div>
         </div>
         <div className="workspace">
           <span>ORGANISATION</span>
-          <button onClick={() => setToast('Organization: Northstar Bank')}>
-            Northstar Bank <ChevronDown size={14} />
+          <button onClick={() => setToast(`Organization: ${sessionProfile?.tenant.name || 'Northstar Bank'}`)}>
+            {sessionProfile?.tenant.name || 'Northstar Bank'} <ChevronDown size={14} />
           </button>
         </div>
         <nav aria-label="Primary navigation">
@@ -399,10 +478,10 @@ export default function Page() {
             </div>
           </div>
           <div className="user-card">
-            <div className="avatar">JD</div>
+          <div className="avatar">{sessionProfile?.user.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'JD'}</div>
             <div>
-              <strong>Jordan Davies</strong>
-              <span>Administrator</span>
+            <strong>{sessionProfile?.user.name || 'Jordan Davies'}</strong>
+            <span>{sessionProfile?.user.role || 'Administrator'}</span>
             </div>
             <MoreHorizontal size={17} />
           </div>
@@ -413,7 +492,7 @@ export default function Page() {
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumb">
-            <span>Northstar Bank</span>
+            <span>{sessionProfile?.tenant.name || 'Northstar Bank'}</span>
             <b>/</b>
             <strong>{active}</strong>
           </div>
@@ -431,7 +510,7 @@ export default function Page() {
               <Bell size={18} />
               <i />
             </button>
-            <div className="top-avatar">JD</div>
+            <div className="top-avatar">{sessionProfile?.user.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'JD'}</div>
           </div>
         </header>
 
@@ -443,12 +522,28 @@ export default function Page() {
                   <span className="eyebrow-dot" /> WORKSPACE
                 </div>
                 <h1>{active}</h1>
-                <p>Manage your organisation&apos;s evidence operations in one place.</p>
+                <p>{active === 'Gold Loan LOS'
+                  ? 'Capture a borrower application, collateral details, and valuation evidence.'
+                  : active === 'Payments'
+                    ? 'Create Razorpay test orders and verify checkout responses without live charges or loan-ledger postings.'
+                    : active === 'Vault & Servicing'
+                      ? 'Review vault, payout, servicing, and collateral-monitoring workflows.'
+                      : 'Manage your organisation&apos;s evidence operations in one place.'}</p>
               </div>
-              <button className="primary-button" onClick={() => setShowCreate(true)}>
-                <Plus size={17} /> New case
-              </button>
+              {active === 'Gold Loan LOS' && (
+                <button className="primary-button" onClick={openCreateCase}>
+                  <Plus size={17} /> New gold-loan application
+                </button>
+              )}
             </section>
+          )}
+
+          {['Gold Loan LOS', 'Vault & Servicing', 'Payments', 'Integrations & settings'].includes(active) && !hasApiSession && (
+            <div className="auth-required-banner" role="status">
+              <ShieldCheck size={17} />
+              <span>Sign in to enable protected workflow actions.</span>
+              <a href="/sign-in">Sign in</a>
+            </div>
           )}
 
           {/* OVERVIEW DASHBOARD */}
@@ -459,15 +554,15 @@ export default function Page() {
                   <div className="eyebrow">
                     <span className="eyebrow-dot" /> CUSTOMER PORTAL <span className="live-pill">LIVE</span>
                   </div>
-                  <h1>Good morning, Jordan</h1>
+                  <h1>Good morning, {sessionProfile?.user.name.split(/\s+/)[0] || 'Jordan'}</h1>
                   <p>Track submissions, respond to requests, and keep every case moving.</p>
                 </div>
-                <button className="primary-button" onClick={() => setShowCreate(true)}>
+                <button className="primary-button" onClick={openCreateCase}>
                   <Plus size={17} /> Create case
                 </button>
               </section>
 
-              {/* MODERN ENTERPRISE KPI CARDS WITH LIVE SPARKLINE TRENDS */}
+              {/* KPI cards show current workload shares, not fabricated historical trends. */}
               <section className="stat-grid">
                 <Stat
                   label="Open cases"
@@ -475,8 +570,9 @@ export default function Page() {
                   note={`${kpis.sla_compliance_rate}% SLA compliance`}
                   icon={FolderKanban}
                   tone="blue"
-                  sparkColor="#2e6df6"
-                  sparkValues={[18, 20, 21, 24, 22, 25, kpis.open_cases]}
+                  chartColor="#2e6df6"
+                  chartValue={openCasesShare}
+                  chartLabel="Share of all cases that are open"
                 />
                 <Stat
                   label="Pending validation"
@@ -484,8 +580,9 @@ export default function Page() {
                   note={`${kpis.validation_pass_rate}% rule pass rate`}
                   icon={ClipboardCheck}
                   tone="amber"
-                  sparkColor="#d59113"
-                  sparkValues={[12, 10, 11, 9, 8, 10, kpis.pending_validation]}
+                  chartColor="#d59113"
+                  chartValue={pendingValidationShare}
+                  chartLabel="Share of open cases pending validation"
                 />
                 <Stat
                   label="Awaiting decision"
@@ -493,8 +590,9 @@ export default function Page() {
                   note={`${kpis.avg_processing_hours}h median turnaround`}
                   icon={Clock3}
                   tone="purple"
-                  sparkColor="#7755cf"
-                  sparkValues={[3, 4, 6, 5, 7, 6, kpis.awaiting_decision]}
+                  chartColor="#7755cf"
+                  chartValue={awaitingDecisionShare}
+                  chartLabel="Share of open cases awaiting a decision"
                 />
                 <Stat
                   label="Open exceptions"
@@ -502,8 +600,9 @@ export default function Page() {
                   note="Dual-control resolved"
                   icon={AlertTriangle}
                   tone="red"
-                  sparkColor="#df5b67"
-                  sparkValues={[6, 5, 4, 4, 3, 2, kpis.open_exceptions]}
+                  chartColor="#df5b67"
+                  chartValue={openExceptionsShare}
+                  chartLabel="Share of open cases with exceptions"
                 />
               </section>
 
@@ -513,7 +612,7 @@ export default function Page() {
                   <span className="section-kicker">GET STARTED</span>
                   <h2>What would you like to do?</h2>
                 </div>
-                <button onClick={() => setShowCreate(true)}>
+                <button onClick={openCreateCase}>
                   <div className="quick-icon blue"><Plus size={18} /></div>
                   <span>
                     <strong>Start a new case</strong>
@@ -621,7 +720,7 @@ export default function Page() {
                           </td>
                           <td>
                             <strong style={{ color: '#1a365d' }}>
-                              ${Number(c.requested_amount).toLocaleString()}
+                              {c.product_type === 'Gold Loan' ? '₹' : '$'}{Number(c.requested_amount).toLocaleString(c.product_type === 'Gold Loan' ? 'en-IN' : 'en-US')}
                             </strong>
                             <span style={{ display: 'block', fontSize: '9px', color: '#8898aa' }}>
                               {c.tenure_months} mo
@@ -677,33 +776,25 @@ export default function Page() {
 
                   {workflowTab === 'donut' ? (
                     <div className="donut-wrap">
-                      <div className="donut">
+                      <div
+                        className="donut"
+                        style={{ background: workflowGradient }}
+                        role="img"
+                        aria-label={`${workflowTotal} cases across ${workflowSegments.length} workflow states`}
+                      >
                         <div>
-                          <strong>{caseList.length || 24}</strong>
+                          <strong>{workflowTotal}</strong>
                           <span>Total cases</span>
                         </div>
                       </div>
                       <div className="legend">
-                        <div>
-                          <i className="blue" />
-                          <span>In progress</span>
-                          <strong>{workflowDist.in_progress}</strong>
-                        </div>
-                        <div>
-                          <i className="green" />
-                          <span>Ready for review</span>
-                          <strong>{workflowDist.ready_for_review}</strong>
-                        </div>
-                        <div>
-                          <i className="amber" />
-                          <span>Awaiting evidence</span>
-                          <strong>{workflowDist.awaiting_evidence}</strong>
-                        </div>
-                        <div>
-                          <i className="gray" />
-                          <span>Approved / Closed</span>
-                          <strong>{workflowDist.approved + workflowDist.exceptions}</strong>
-                        </div>
+                        {workflowSegments.map(segment => (
+                          <div key={segment.label}>
+                            <i style={{ background: segment.color }} />
+                            <span>{segment.label}</span>
+                            <strong>{segment.value}</strong>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ) : (
@@ -772,7 +863,7 @@ export default function Page() {
           {active === 'Evidence inbox' && (
             <EvidenceView
               evidenceList={evidenceList}
-              onCreate={() => setShowCreate(true)}
+              onReviewCases={() => go('My cases')}
               onUpload={handleFileUpload}
             />
           )}
@@ -808,6 +899,32 @@ export default function Page() {
             <SearchExportView cases={caseList} />
           )}
 
+          {active === 'Integrations & settings' && (
+            <IntegrationsView
+              adapters={adapters}
+              onRefresh={refreshData}
+              setToast={setToast}
+              hasApiSession={hasApiSession}
+            />
+          )}
+
+          {active === 'Gold Loan LOS' && (
+            <GoldLoanStationView
+              setToast={setToast}
+              hasApiSession={hasApiSession}
+            />
+          )}
+
+          {active === 'Vault & Servicing' && (
+            <VaultServicingView
+              setToast={setToast}
+              hasApiSession={hasApiSession}
+            />
+          )}
+
+          {active === 'Payments' && (
+            <PaymentsView hasApiSession={hasApiSession} setToast={setToast} />
+          )}
           {/* BOTTOM AUDIT ASSURANCE STRIP */}
           {active === 'Overview' && (
             <section className="bottom-strip">
@@ -833,9 +950,11 @@ export default function Page() {
             <form className="modal-form" onSubmit={submitCase}>
               <div className="modal-header">
                 <div>
-                  <span className="eyebrow">NEW SUBMISSION</span>
-                  <h2>Create a new case</h2>
-                  <p>Start an evidence request for your organisation.</p>
+                  <span className="eyebrow">{active === 'Gold Loan LOS' ? 'GOLD LOAN INTAKE' : 'NEW SUBMISSION'}</span>
+                  <h2>{active === 'Gold Loan LOS' ? 'Start a gold-loan application' : 'Create a new case'}</h2>
+                  <p>{active === 'Gold Loan LOS'
+                    ? 'Creates an authenticated intake record only; it does not approve or disburse a loan.'
+                    : 'Start an evidence request for your organisation.'}</p>
                 </div>
                 <button
                   type="button"
@@ -856,14 +975,40 @@ export default function Page() {
                 />
               </label>
 
+              {active === 'Gold Loan LOS' && (
+                <>
+                  <label>
+                    Gold item type
+                    <select name="goldItemType" defaultValue="Gold jewellery">
+                      <option>Gold jewellery</option>
+                      <option>Gold coins / bullion</option>
+                      <option>Gold chain</option>
+                      <option>Gold bangle</option>
+                    </select>
+                  </label>
+                  <label>
+                    Estimated gross weight (grams)
+                    <input name="goldWeightGrams" type="number" min="0.1" step="0.1" placeholder="25.0" required />
+                  </label>
+                  <label>
+                    Stated purity
+                    <select name="goldPurity" defaultValue="9160">
+                      <option value="9990">24K · 999 fineness</option>
+                      <option value="9160">22K · 916 fineness</option>
+                      <option value="7500">18K · 750 fineness</option>
+                    </select>
+                  </label>
+                </>
+              )}
+
               <label>
-                Requested amount ($ USD)
+                Requested amount ({active === 'Gold Loan LOS' ? '₹ INR' : '$ USD'})
                 <input
                   name="requestedAmount"
                   type="number"
-                  min="1000"
-                  step="1000"
-                  placeholder="250000"
+                  min={active === 'Gold Loan LOS' ? '1' : '1000'}
+                  step={active === 'Gold Loan LOS' ? '1000' : '1000'}
+                  placeholder={active === 'Gold Loan LOS' ? '150000' : '250000'}
                   required
                 />
               </label>
@@ -871,6 +1016,7 @@ export default function Page() {
               <label>
                 Tenure
                 <select name="tenureMonths" defaultValue="12">
+                  <option value="3">3 months</option>
                   <option value="6">6 months</option>
                   <option value="12">12 months</option>
                   <option value="24">24 months</option>
@@ -882,7 +1028,7 @@ export default function Page() {
                 Purpose / Facility Note
                 <input
                   name="purpose"
-                  placeholder="Working capital or asset procurement"
+                  placeholder={active === 'Gold Loan LOS' ? 'Branch, sourcing channel, or intake note' : 'Working capital or asset procurement'}
                 />
               </label>
 
@@ -1022,7 +1168,7 @@ export default function Page() {
                 </div>
                 <div>
                   <span>REQUESTED AMOUNT</span>
-                  <strong>${Number(caseDetail.case.requested_amount).toLocaleString()}</strong>
+                  <strong>{caseDetail.case.product_type === 'Gold Loan' ? '₹' : '$'}{Number(caseDetail.case.requested_amount).toLocaleString(caseDetail.case.product_type === 'Gold Loan' ? 'en-IN' : 'en-US')}</strong>
                 </div>
                 <div>
                   <span>FACILITY TYPE</span>
@@ -1159,7 +1305,7 @@ export default function Page() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong>Decision: {d.outcome} by {d.actor_name}</strong>
                         <span style={{ fontSize: '10px', color: '#889bb0' }}>
-                          {new Date(d.created_at).toLocaleString()}
+                          {formatDateTime(d.created_at)}
                         </span>
                       </div>
                       <p>{d.rationale}</p>
@@ -1199,7 +1345,7 @@ function SubPage({ title, subtitle, children, action }: any) {
 }
 
 /* EVIDENCE INBOX VIEW */
-function EvidenceView({ evidenceList, onCreate, onUpload }: any) {
+function EvidenceView({ evidenceList, onReviewCases, onUpload }: any) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -1222,9 +1368,6 @@ function EvidenceView({ evidenceList, onCreate, onUpload }: any) {
             />
             <UploadCloud size={16} /> Upload document
           </button>
-          <button className="primary-button" onClick={onCreate}>
-            <Plus size={16} /> Request package
-          </button>
         </div>
       }
     >
@@ -1233,14 +1376,14 @@ function EvidenceView({ evidenceList, onCreate, onUpload }: any) {
           <span>NEEDS YOUR RESPONSE</span>
           <strong>4 evidence requests</strong>
           <p>Documents requested by Northstar Bank reviewers.</p>
-          <button className="text-button" onClick={onCreate}>
-            Review requests <ArrowUpRight size={14} />
+          <button className="text-button" onClick={onReviewCases}>
+            Review cases <ArrowUpRight size={14} />
           </button>
         </div>
         <div className="inbox-card">
           <span>PROCESSING & CHECKSUM</span>
           <strong>{evidenceList.length || 8} packages validating</strong>
-          <p>AURA is checking completeness and SHA-256 integrity.</p>
+          <p>AURUM is checking completeness and SHA-256 integrity.</p>
           <button className="text-button">
             View processing <ArrowUpRight size={14} />
           </button>
@@ -1410,7 +1553,7 @@ function BillingView({ billing }: { billing: BillingSummary | null }) {
           <h2>{data.plan_name}</h2>
           <p>Built for teams running high-volume evidence operations.</p>
           <div className="price">
-            ${data.monthly_price.toLocaleString()} <small>/ month</small>
+            ${data.monthly_price.toLocaleString('en-US')} <small>/ month</small>
           </div>
           <button className="primary-button">Manage subscription</button>
         </div>
@@ -1545,7 +1688,7 @@ function AuditView({ events, isVerified, onVerify }: any) {
                   Entity: {e.entity_type}/{e.entity_id.slice(0, 8)} · Hash: {e.current_hash?.slice(0, 16)}…
                 </span>
               </div>
-              <time>{new Date(e.created_at).toLocaleString()}</time>
+              <time>{formatDateTime(e.created_at)}</time>
               <span className="actor">{e.actor_name}</span>
             </div>
           ))}
@@ -1673,7 +1816,7 @@ function SearchExportView({ cases }: { cases: CaseItem[] }) {
                   <td><strong>{c.case_number}</strong></td>
                   <td>{c.customer_name}</td>
                   <td>{c.product_type}</td>
-                  <td>${Number(c.requested_amount).toLocaleString()}</td>
+                  <td>{c.product_type === 'Gold Loan' ? '₹' : '$'}{Number(c.requested_amount).toLocaleString(c.product_type === 'Gold Loan' ? 'en-IN' : 'en-US')}</td>
                   <td><Status tone={getTone(c.status)}>{getDisplayStatus(c.status)}</Status></td>
                 </tr>
               ))}

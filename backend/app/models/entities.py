@@ -83,6 +83,25 @@ class Case(Base):
     decisions = relationship("Decision", back_populates="case", cascade="all, delete-orphan")
     exceptions = relationship("ExceptionItem", back_populates="case", cascade="all, delete-orphan")
 
+class PaymentOrder(Base):
+    __tablename__ = "payment_orders"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    loan_id = Column(String(100), nullable=False, index=True)
+    idempotency_key = Column(String(40), nullable=False)
+    provider_order_id = Column(String(100), nullable=True, unique=True, index=True)
+    provider_payment_id = Column(String(100), nullable=True, unique=True)
+    amount_paise = Column(Integer, nullable=False)
+    currency = Column(String(3), nullable=False, default="INR")
+    status = Column(String(40), nullable=False, default="CREATION_PENDING")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_payment_order_tenant_idempotency"),
+    )
+
 class EvidenceItem(Base):
     __tablename__ = "evidence_items"
     

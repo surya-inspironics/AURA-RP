@@ -57,3 +57,55 @@ def get_current_tenant_and_user(
         )
 
     return tenant, user, role
+
+
+def require_authenticated_tenant_and_user(
+    auth_creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    x_tenant_id: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> Tuple[Tenant, User, str]:
+    """Resolve a valid bearer identity and a tenant membership without demo fallback."""
+    if not auth_creds or not auth_creds.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication is required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    payload = decode_access_token(auth_creds.credentials)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    user = db.query(User).filter(
+        User.id == payload["sub"],
+        User.is_active.is_(True)
+    ).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Active user not found")
+
+    requested_tenant_id = x_tenant_id or payload.get("tenant_id")
+    membership_query = db.query(Membership).filter(Membership.user_id == user.id)
+    if requested_tenant_id:
+        membership_query = membership_query.filter(Membership.tenant_id == requested_tenant_id)
+    membership = membership_query.first()
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User has no membership in this tenant")
+
+    tenant = db.query(Tenant).filter(Tenant.id == membership.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant membership is invalid")
+
+    return tenant, user, membership.role
+
+
+def require_workspace_admin(
+    ctx: Tuple[Tenant, User, str] = Depends(require_authenticated_tenant_and_user)
+) -> Tuple[Tenant, User, str]:
+    tenant, user, role = ctx
+    if role.lower() not in {"owner", "admin"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace owner or admin role is required")
+    return tenant, user, role

@@ -6,13 +6,13 @@ from backend.app.core.config import settings
 from backend.app.database.session import Base, engine, SessionLocal
 from backend.app.database.seed import seed_initial_data
 from backend.app.routers import (
-    auth, cases, evidence, validation, decisions, audit, analytics, team, billing, system
+    auth, cases, evidence, validation, decisions, audit, analytics, team, billing, system, integrations, gold_loan
 )
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
-    description="AURA Production-Grade Multi-Tenant Enterprise SaaS — Evidence Intake, Validation, and Decision Traceability.",
+    description="AURA development API for evidence intake, validation, decision traceability, and gold-loan workflow simulations.",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc"
@@ -59,6 +59,8 @@ app.include_router(analytics.router, prefix=settings.API_V1_STR)
 app.include_router(team.router, prefix=settings.API_V1_STR)
 app.include_router(billing.router, prefix=settings.API_V1_STR)
 app.include_router(system.router, prefix=settings.API_V1_STR)
+app.include_router(integrations.router, prefix=settings.API_V1_STR)
+app.include_router(gold_loan.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

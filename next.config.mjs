@@ -11,6 +11,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/v1/integrations',
+        destination: `${pythonBackendUrl}/api/v1/integrations/`,
+      },
+      {
         source: '/api/v1/:path*',
         destination: `${pythonBackendUrl}/api/v1/:path*`,
       },
