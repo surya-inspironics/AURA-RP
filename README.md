@@ -1,18 +1,18 @@
-# AURA — Enterprise Evidence Intake, Validation & Decision Traceability
+# AURUM — Enterprise Evidence Intake, Validation & Decision Traceability
 
-> **Production-Grade Multi-Tenant SaaS Platform**  
+> **Development-Stage Multi-Tenant SaaS Implementation**
 > Built with Next.js 16, React 19, TypeScript, and a high-performance Python FastAPI backend.
 
 ---
 
 ## 1. System Overview
 
-AURA is an enterprise SaaS platform engineered for financial institutions and regulated enterprises. It provides end-to-end evidence intake, automated deterministic policy validation, maker-checker decision governance, and a tamper-evident, cryptographically chained audit history.
+AURUM is a development implementation of an evidence intake and decision-traceability platform. Some general SaaS workflows are backed by the API and database; the gold-loan workflows are currently development simulators and are not production-ready.
 
 - **Frontend**: Next.js 16.4 (App Router), React 19, TypeScript 5.7, Tailwind CSS 4, Lucide Icons. The existing brand identity, typography, visual hierarchy, and UX design have been preserved intact.
 - **Backend**: Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic v2, PyJWT, Bcrypt, Asyncpg / Psycopg2.
 - **Persistence**: Multi-tenant PostgreSQL (Neon / AWS RDS) with local SQLite fallback for seamless development.
-- **Security**: Complete tenant isolation, least-privilege RBAC, maker-checker authorization controls, private file storage with SHA-256 integrity validation, and append-only cryptographic audit logging.
+- **Security**: General SaaS routes include tenant and role controls, private file storage, and audit logging. Gold-loan and integration routes require authentication, but tenant-scoped persistence, full authorization coverage, provider integrations, and complete audit records remain outstanding. See the [implementation traceability matrix](./docs/implementation/REQUIREMENT_TRACEABILITY_MATRIX_I0_I7.md).
 
 ---
 
@@ -97,7 +97,7 @@ pnpm test:backend
 # Or directly: python -m pytest backend/tests -v
 ```
 
-All 10 test suites cover:
+The current backend suite covers:
 - Health check & readiness
 - User registration & JWT authentication
 - **Cross-tenant data isolation** (verifying Tenant B cannot access Tenant A records)
@@ -106,4 +106,4 @@ All 10 test suites cover:
 - Deterministic policy validation engine execution
 - Maker-checker decision approval workflow
 - Cryptographic hash-chain audit log integrity
-- Real-time KPI aggregation and dashboard metrics
+- Gold-loan calculation and simulator guard behavior. These tests do not certify end-to-end or production workflows.

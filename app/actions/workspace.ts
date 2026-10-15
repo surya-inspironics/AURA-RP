@@ -12,7 +12,7 @@ export async function ensureWorkspace() {
   const existing = await db.select().from(membership).where(eq(membership.userId, session.user.id)).limit(1)
   if (existing[0]) return existing[0].organizationId
   const organizationId = crypto.randomUUID()
-  const slug = `${session.user.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'aura'}-${organizationId.slice(0, 6)}`
+  const slug = `${session.user.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'aurum'}-${organizationId.slice(0, 6)}`
   await db.insert(organization).values({ id: organizationId, name: `${session.user.name}'s workspace`, slug })
   await db.insert(membership).values({ id: crypto.randomUUID(), organizationId, userId: session.user.id, role: 'owner' })
   return organizationId

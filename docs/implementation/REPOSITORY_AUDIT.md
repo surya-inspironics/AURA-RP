@@ -1,4 +1,4 @@
-# AURA Implementation Audit Report
+# AURUM Implementation Audit Report
 
 **Audit date:** 15 October 2026  
 **Scope:** Current repository implementation compared with supplied AURA MRS, PRS 2.0, SyRS, HLD 2.0, LLD, PDLC and master implementation prompt.
@@ -45,7 +45,7 @@ The repository contains a polished single-page Next.js customer-workspace protot
 
 ## 3. Module-flow audit
 
-| AURA component | Expected responsibility | Current evidence | Result |
+| AURUM component | Expected responsibility | Current evidence | Result |
 |---|---|---|---|
 | C-01 Web client/operator console | Responsive views, case/evidence/review/admin flows | Single `app/page.tsx` with Overview, My cases, Evidence inbox, Team, Billing, Settings and Audit history views | **Partial** |
 | C-02 API gateway/identity boundary | Auth, authorization, validation, limits, API versioning, audit logging | No API routes or identity boundary | **Missing** |
@@ -130,7 +130,7 @@ The source material establishes a baseline of PR-01 through PR-12, 38 functional
 
 ## 9. Audit verdict
 
-**Not ready for production or customer deployment as a SaaS product.** The current implementation is a credible frontend prototype and useful visual foundation, but the core AURA product behavior and control plane remain to be built and verified.
+**Not ready for production or customer deployment as a SaaS product.** The current implementation is a credible frontend prototype and useful visual foundation, but the core AURUM product behavior and control plane remain to be built and verified.
 
 **Evidence inspected:** repository source files, dependency manifest, production build output, supplied DOCX document inventory and the supplied AURA master implementation prompt.
 

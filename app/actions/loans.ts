@@ -20,7 +20,7 @@ export async function createLoanApplication(input: { customerName: string; reque
   let organizationId = member[0]?.organizationId
   if (!organizationId) {
     organizationId = crypto.randomUUID()
-    const slug = `${user.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'aura'}-${organizationId.slice(0, 6)}`
+    const slug = `${user.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'aurum'}-${organizationId.slice(0, 6)}`
     await db.insert(organization).values({ id: organizationId, name: `${user.name}'s workspace`, slug })
     await db.insert(membership).values({ id: crypto.randomUUID(), organizationId, userId: user.id, role: 'owner' })
   }

@@ -1,7 +1,7 @@
-# AURA Gold Loan LOS/LMS Reconciliation Audit
+# AURUM Gold Loan LOS/LMS Reconciliation Audit
 
 **Audit date:** 15 October 2026  
-**Scope:** Existing AURA repository, current implementation audit, supplied gold-loan master prompt, architecture/DFD diagrams, and eligibility-calculation reference.
+**Scope:** Existing AURUM repository, current implementation audit, supplied gold-loan master prompt, architecture/DFD diagrams, and eligibility-calculation reference.
 
 ## Executive verdict
 
@@ -131,7 +131,7 @@ Before implementation, add approved specifications for:
 
 ## Final conclusion
 
-The current AURA implementation is a credible visual foundation but has no verified gold-loan business execution path. The supplied target is materially broader than the existing evidence-intake prototype. The next safe step is specification reconciliation and a small end-to-end vertical slice—not a wholesale scaffold of all workspaces and infrastructure.
+The current AURUM implementation is a credible visual foundation but has no verified gold-loan business execution path. The supplied target is materially broader than the existing evidence-intake prototype. The next safe step is specification reconciliation and a small end-to-end vertical slice—not a wholesale scaffold of all workspaces and infrastructure.
 
 **Evidence basis:** existing repository audit, source requirements/architecture documents, gold-loan master-prompt review text, architecture/DFD references and eligibility-calculation reference.
 

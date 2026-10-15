@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'AURA | Evidence Operations',
+  title: 'AURUM | Evidence Operations',
   description: 'Evidence intake, validation, decision traceability and audit review.',
 }
 
