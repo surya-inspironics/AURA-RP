@@ -1,12 +1,14 @@
 import pytest
 import os
 import io
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database.session import Base, engine, SessionLocal
 from backend.app.database.seed import seed_initial_data
 from backend.app.models.entities import Tenant, User, Membership, Case, EvidenceItem
 from backend.app.services.audit_service import AuditService
+from backend.app.services.analytics_service import AnalyticsService
 
 client = TestClient(app)
 
@@ -195,5 +197,28 @@ def test_analytics_dashboard_metrics():
     assert "workflow" in dash
     assert "trends" in dash
     assert "funnel" in dash
-    assert dash["kpis"]["open_cases"] >= 1
-    assert dash["kpis"]["sla_compliance_rate"] > 0
+    assert dash["kpis"]["open_cases"] >= 0
+    assert dash["kpis"]["sla_compliance_rate"] >= 0
+
+def test_analytics_empty_workspace_reports_zero_counts():
+    db = Mock()
+    query = Mock()
+    query.filter.return_value = query
+    query.all.return_value = []
+    query.count.return_value = 0
+    db.query.return_value = query
+
+    dashboard = AnalyticsService.get_dashboard_metrics(db, "empty-tenant")
+
+    assert dashboard["kpis"]["total_cases"] == 0
+    assert dashboard["kpis"]["open_cases"] == 0
+    assert dashboard["kpis"]["pending_validation"] == 0
+    assert dashboard["kpis"]["awaiting_decision"] == 0
+    assert dashboard["kpis"]["open_exceptions"] == 0
+    assert sum(dashboard["workflow"].values()) == 0
+    assert dashboard["kpis"]["validation_pass_rate"] == 0
+    assert dashboard["kpis"]["sla_compliance_rate"] == 0
+    assert all(
+        trend["submitted"] == trend["validated"] == trend["decided"] == 0
+        for trend in dashboard["trends"]
+    )

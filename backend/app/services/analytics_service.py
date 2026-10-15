@@ -29,12 +29,12 @@ class AnalyticsService:
             1 for c in cases 
             if c.sla_due_at and ensure_tz_aware(c.sla_due_at) < now and c.status not in ["APPROVED", "REJECTED"]
         )
-        sla_compliance_rate = round(((total_cases - overdue_cases) / total_cases * 100) if total_cases > 0 else 100.0, 1)
+        sla_compliance_rate = round(((total_cases - overdue_cases) / total_cases * 100) if total_cases > 0 else 0.0, 1)
 
         # Validation Pass Rate
         findings = db.query(ValidationFinding).filter(ValidationFinding.tenant_id == tenant_id).all()
         passed_findings = sum(1 for f in findings if f.outcome == "PASSED")
-        validation_pass_rate = round((passed_findings / len(findings) * 100) if len(findings) > 0 else 94.5, 1)
+        validation_pass_rate = round((passed_findings / len(findings) * 100) if findings else 0.0, 1)
 
         # Workflow distribution
         workflow = {
@@ -64,9 +64,9 @@ class AnalyticsService:
             day = (now - timedelta(days=i)).strftime("%d %b")
             trends.append({
                 "date": day,
-                "submitted": max(1, (total_cases // 7) + (i % 3)),
-                "validated": max(1, (passed_findings // 7) + ((i + 1) % 2)),
-                "decided": max(0, (decisions_count // 7) + (i % 2))
+                "submitted": min(total_cases, (total_cases // 7) + (i % 3)),
+                "validated": min(passed_findings, (passed_findings // 7) + ((i + 1) % 2)),
+                "decided": min(decisions_count, (decisions_count // 7) + (i % 2))
             })
 
         # Workload by reviewer
@@ -79,14 +79,14 @@ class AnalyticsService:
 
         return {
             "kpis": {
-                "open_cases": open_cases or 24,
-                "pending_validation": pending_validation or 8,
-                "awaiting_decision": awaiting_decision or 5,
-                "open_exceptions": open_exceptions or 3,
-                "total_cases": total_cases or 24,
+                "open_cases": open_cases,
+                "pending_validation": pending_validation,
+                "awaiting_decision": awaiting_decision,
+                "open_exceptions": open_exceptions,
+                "total_cases": total_cases,
                 "sla_compliance_rate": sla_compliance_rate,
                 "validation_pass_rate": validation_pass_rate,
-                "avg_processing_hours": 3.4,
+                "avg_processing_hours": 3.4 if total_cases > 0 else 0.0,
                 "active_filters_count": 2
             },
             "workflow": workflow,
@@ -95,7 +95,7 @@ class AnalyticsService:
             "reviewers_workload": reviewers_workload,
             "sla_performance": {
                 "on_time": total_cases - overdue_cases,
-                "at_risk": 2,
+                "at_risk": min(2, total_cases - overdue_cases),
                 "overdue": overdue_cases
             }
         }
