@@ -1,18 +1,53 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Zap, ShieldCheck, AlertTriangle, FileText,
   Activity, Scale, Coins, RefreshCw
 } from 'lucide-react'
-import { api, ValuationResponse } from '@/lib/api'
+import { api, GoldLoanApplicationItem, ValuationResponse } from '@/lib/api'
+
+const VALUATION_LIMIT_KEYS = [
+  'COLLATERAL_LTV_LIMIT',
+  'BORROWER_CREDIT_LIMIT',
+  'INCOME_CAPACITY_LIMIT',
+  'PRODUCT_SCHEME_CAP',
+  'GROUP_EXPOSURE_LIMIT',
+] satisfies Array<keyof ValuationResponse['limits_comparison_paise']>
 
 interface GoldLoanStationProps {
   setToast: (msg: string) => void
   hasApiSession: boolean
+  refreshVersion: number
 }
 
-export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStationProps) {
+export function GoldLoanStationView({ setToast, hasApiSession, refreshVersion }: GoldLoanStationProps) {
+  const [applications, setApplications] = useState<GoldLoanApplicationItem[]>([])
+  const [selectedApplicationId, setSelectedApplicationId] = useState('')
+  const [applicationsLoading, setApplicationsLoading] = useState(false)
+  const selectedApplication = useMemo(
+    () => applications.find(application => application.id === selectedApplicationId) || applications[0] || null,
+    [applications, selectedApplicationId]
+  )
+
+  async function refreshApplications(preferredId?: string) {
+    if (!hasApiSession) return
+    setApplicationsLoading(true)
+    try {
+      const rows = await api.getGoldLoanApplications()
+      setApplications(rows)
+      const nextId = preferredId || selectedApplicationId
+      if (nextId && rows.some(row => row.id === nextId)) setSelectedApplicationId(nextId)
+      else if (rows[0]) setSelectedApplicationId(rows[0].id)
+      else setSelectedApplicationId('')
+    } catch (err: any) {
+      setToast(err.message || 'Could not load gold-loan applications')
+    } finally {
+      setApplicationsLoading(false)
+    }
+  }
+
+  useEffect(() => { refreshApplications() }, [hasApiSession, refreshVersion])
   // Device & Assay state
   const [deviceId, setDeviceId] = useState('DEV-XRF-001')
   const [itemType, setItemType] = useState('Gold Bangle')
@@ -37,14 +72,38 @@ export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStation
   const [kycResult, setKycResult] = useState<any>(null)
   const [kycLoading, setKycLoading] = useState(false)
 
+  useEffect(() => {
+    if (!selectedApplication) return
+    setCustomerName(selectedApplication.customer_name || '')
+    const firstItem = selectedApplication.collateral_items[0]
+    if (firstItem) {
+      setItemType(firstItem.item_type)
+      setGrossWeightGrams(firstItem.gross_weight_mg / 1000)
+      setStoneDeductionGrams(firstItem.stone_deduction_mg / 1000)
+      setPurityBps(firstItem.purity_bps)
+    }
+    setValuationResult(selectedApplication.valuations.at(-1)?.result || null)
+  }, [selectedApplicationId, applications])
+
   // 1. Capture Signed Device Reading
   async function handleCaptureReading() {
+    if (!selectedApplication) {
+      setToast('Create a gold-loan application before recording an assay event.')
+      return
+    }
     setAssayLoading(true)
     try {
       const grossMg = Math.round(grossWeightGrams * 1000)
       const rawReading = await api.simulateDeviceReading(deviceId, grossMg, purityBps)
       const verified = await api.verifyDeviceReading(rawReading)
+      await api.recordGoldLoanAssaySimulation(selectedApplication.id, {
+        device_id: deviceId,
+        gross_weight_mg: verified.gross_weight_mg,
+        purity_bps: verified.purity_bps,
+        signature_checked: true,
+      })
       setVerifiedReading(verified)
+      await refreshApplications(selectedApplication.id)
       setToast(`Simulated assay signature checked: ${verified.purity_karat}K (${verified.gross_weight_mg / 1000}g). Not an authenticated device reading.`)
     } catch (err: any) {
       setToast(err.message || 'Assay reading failed')
@@ -55,11 +114,15 @@ export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStation
 
   // 2. Run Eligibility Engine
   async function handleCalculateEligibility() {
+    if (!selectedApplication) {
+      setToast('Create a gold-loan application before saving a valuation preview.')
+      return
+    }
     setCalcLoading(true)
     try {
       const grossMg = Math.round(grossWeightGrams * 1000)
       const stoneMg = Math.round(stoneDeductionGrams * 1000)
-      const result = await api.calculateValuation({
+      const saved = await api.recordGoldLoanValuation(selectedApplication.id, {
         items: [{
           item_type: itemType,
           gross_weight_mg: grossMg,
@@ -67,9 +130,13 @@ export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStation
           purity_bps: purityBps
         }],
         ltv_scheme_pct: ltvScheme,
-        credit_limit_paise: creditLimitInr * 100
+        credit_limit_paise: creditLimitInr * 100,
+        policy_version: 'DEMO-POLICY-1',
       })
+      const result = saved.result
       setValuationResult(result)
+      setApplications(rows => [saved.application, ...rows.filter(row => row.id !== saved.application.id)])
+      setSelectedApplicationId(saved.application.id)
       setToast(`Simulated valuation calculated: ₹${result.summary.eligible_loan_amount_inr.toLocaleString('en-IN')}; not a lending decision.`)
     } catch (err: any) {
       setToast(err.message || 'Valuation failed')
@@ -92,12 +159,24 @@ export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStation
       setToast('Confirm consent to run the local KYC simulator.')
       return
     }
+    if (!selectedApplication) {
+      setToast('Create a gold-loan application before recording consent and verification attempts.')
+      return
+    }
 
     setKycLoading(true)
     try {
+      await api.recordGoldLoanConsent(selectedApplication.id, true)
       const panRes = await api.verifyPan(panNumber, customerName)
       const aadhaarRes = await api.verifyAadhaar(aadhaarNumber, aadhaarOtp, simulatorConsent)
       setKycResult({ pan: panRes, aadhaar: aadhaarRes })
+      await api.recordGoldLoanKycSimulation(selectedApplication.id, {
+        pan_status: panRes.status || 'INDETERMINATE',
+        aadhaar_status: aadhaarRes.status || 'INDETERMINATE',
+        masked_pan: panRes.masked_pan,
+        masked_aadhaar: aadhaarRes.masked_aadhaar,
+      })
+      await refreshApplications(selectedApplication.id)
       setPanNumber('')
       setAadhaarNumber('')
       setAadhaarOtp('')
@@ -130,9 +209,61 @@ export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStation
       <div className="subpage-head">
         <div>
           <h2>Gold Loan LOS — Assay Station & Eligibility Engine</h2>
-          <p>Assay and valuation development simulator. Use synthetic test data only; no verified reading or lending decision is produced.</p>
+          <p>Pilot intake simulator only. Final approval, rejection, and referral actions are disabled until underwriting policy, identity verification, trusted appraisal, and an authorized gold-rate source are approved.</p>
         </div>
       </div>
+
+      <section className="panel gold-application-workspace">
+        <div className="panel-heading">
+          <div>
+            <h2>Application workflow record</h2>
+            <p>Consent, simulator attempts and valuation previews are saved to the tenant-scoped application timeline.</p>
+          </div>
+          <button className="secondary-button" onClick={() => refreshApplications()} disabled={!hasApiSession || applicationsLoading}>
+            <RefreshCw size={13} /> {applicationsLoading ? 'Syncing' : 'Refresh'}
+          </button>
+        </div>
+        {!hasApiSession ? (
+          <div className="auth-required-banner"><ShieldCheck size={16} /><span>Sign in to view persistent application records.</span></div>
+        ) : applications.length === 0 ? (
+          <div className="gold-application-empty"><strong>No gold-loan applications yet</strong><span>Create one with “New gold-loan application” to attach consent, appraisal and audit history.</span></div>
+        ) : (
+          <>
+            <label className="gold-application-select">Active application
+              <select value={selectedApplication?.id || ''} onChange={event => {
+                setSelectedApplicationId(event.target.value)
+                setValuationResult(null)
+                setVerifiedReading(null)
+              }}>
+                {applications.map(application => <option key={application.id} value={application.id}>{application.case_number} · {application.customer_name}</option>)}
+              </select>
+            </label>
+            {selectedApplication && (
+              <>
+                <div className="gold-workflow-stages">
+                  {[
+                    ['Application', selectedApplication.stage],
+                    ['Consent', selectedApplication.consent_status],
+                    ['KYC', selectedApplication.kyc_status],
+                    ['Appraisal', selectedApplication.appraisal_status],
+                    ['Decision', selectedApplication.decision_status],
+                  ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value.replaceAll('_', ' ')}</strong></div>)}
+                </div>
+                <div className="gold-event-timeline" aria-label="Application activity timeline">
+                  {selectedApplication.events.slice(-5).reverse().map(event => (
+                    <div className="gold-event-row" key={event.id}>
+                      <i className={event.is_simulated ? 'simulated' : ''} />
+                      <div><strong>{event.action.replaceAll('.', ' ')}</strong><span>{event.actor_name}{event.is_simulated ? ' · SIMULATED' : ''}</span></div>
+                      <time>{new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.created_at))}</time>
+                    </div>
+                  ))}
+                  {selectedApplication.events.length === 0 && <span className="gold-no-events">No activity recorded yet.</span>}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="gold-kpi-grid" aria-label="Current collateral snapshot">
         <article className="gold-kpi-card">
@@ -385,22 +516,26 @@ export function GoldLoanStationView({ setToast, hasApiSession }: GoldLoanStation
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(valuationResult.limits_comparison_inr).map(([limitName, inrVal]) => (
-                      <tr key={limitName}>
-                        <td><strong>{limitName}</strong></td>
-                        <td style={{ fontFamily: 'monospace' }}>
-                          {(valuationResult.limits_comparison_paise[limitName]).toLocaleString('en-IN')} paise
-                        </td>
-                        <td>₹{inrVal.toLocaleString('en-IN')}</td>
-                        <td>
-                          {valuationResult.summary.binding_constraint === limitName ? (
-                            <span className="binding-pill">BINDING LIMIT</span>
-                          ) : (
-                            <span style={{ color: '#16a34a', fontSize: '10px' }}>Non-binding</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {VALUATION_LIMIT_KEYS.map(limitName => {
+                      const inrVal = valuationResult.limits_comparison_inr[limitName]
+                      const paiseVal = valuationResult.limits_comparison_paise[limitName]
+                      return (
+                        <tr key={limitName}>
+                          <td><strong>{limitName}</strong></td>
+                          <td style={{ fontFamily: 'monospace' }}>
+                            {paiseVal.toLocaleString('en-IN')} paise
+                          </td>
+                          <td>₹{inrVal.toLocaleString('en-IN')}</td>
+                          <td>
+                            {valuationResult.summary.binding_constraint === limitName ? (
+                              <span className="binding-pill">BINDING LIMIT</span>
+                            ) : (
+                              <span style={{ color: '#16a34a', fontSize: '10px' }}>Non-binding</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

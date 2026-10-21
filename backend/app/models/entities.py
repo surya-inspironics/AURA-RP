@@ -102,6 +102,107 @@ class PaymentOrder(Base):
         UniqueConstraint("tenant_id", "idempotency_key", name="uq_payment_order_tenant_idempotency"),
     )
 
+class GoldLoanCustomer(Base):
+    __tablename__ = "gold_loan_customers"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    external_customer_reference = Column(String(100), nullable=True)
+    display_name = Column(String(255), nullable=False)
+    created_by = Column(String(36), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    applications = relationship("GoldLoanApplication", back_populates="customer")
+    __table_args__ = (UniqueConstraint("tenant_id", "external_customer_reference", name="uq_gold_customer_tenant_reference"),)
+
+class GoldLoanApplication(Base):
+    __tablename__ = "gold_loan_applications"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    case_id = Column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    customer_id = Column(String(36), ForeignKey("gold_loan_customers.id", ondelete="RESTRICT"), nullable=False, index=True)
+    branch_reference = Column(String(100), nullable=True)
+    stage = Column(String(40), nullable=False, default="DRAFT")
+    consent_status = Column(String(40), nullable=False, default="NOT_RECORDED")
+    kyc_status = Column(String(40), nullable=False, default="NOT_STARTED")
+    appraisal_status = Column(String(40), nullable=False, default="NOT_STARTED")
+    decision_status = Column(String(40), nullable=False, default="NOT_SUBMITTED")
+    created_by = Column(String(36), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    case = relationship("Case")
+    customer = relationship("GoldLoanCustomer", back_populates="applications")
+    consents = relationship("GoldLoanConsent", back_populates="application", cascade="all, delete-orphan")
+    collateral_items = relationship("GoldLoanCollateralItem", back_populates="application", cascade="all, delete-orphan")
+    valuations = relationship("GoldLoanValuation", back_populates="application", cascade="all, delete-orphan")
+    events = relationship("GoldLoanWorkflowEvent", back_populates="application", cascade="all, delete-orphan")
+
+class GoldLoanConsent(Base):
+    __tablename__ = "gold_loan_consents"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    application_id = Column(String(36), ForeignKey("gold_loan_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose = Column(String(120), nullable=False)
+    wording_version = Column(String(50), nullable=False)
+    capture_method = Column(String(50), nullable=False)
+    accepted = Column(Boolean, nullable=False)
+    captured_by = Column(String(36), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    application = relationship("GoldLoanApplication", back_populates="consents")
+
+class GoldLoanCollateralItem(Base):
+    __tablename__ = "gold_loan_collateral_items"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    application_id = Column(String(36), ForeignKey("gold_loan_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_reference = Column(String(50), nullable=False)
+    item_type = Column(String(100), nullable=False)
+    gross_weight_mg = Column(Integer, nullable=False)
+    stone_deduction_mg = Column(Integer, nullable=False, default=0)
+    purity_bps = Column(Integer, nullable=False)
+    source = Column(String(30), nullable=False, default="MANUAL_SIMULATOR")
+    is_simulated = Column(Boolean, nullable=False, default=True)
+    created_by = Column(String(36), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    application = relationship("GoldLoanApplication", back_populates="collateral_items")
+    __table_args__ = (UniqueConstraint("application_id", "item_reference", name="uq_gold_collateral_app_item"),)
+
+class GoldLoanValuation(Base):
+    __tablename__ = "gold_loan_valuations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    application_id = Column(String(36), ForeignKey("gold_loan_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    result_json = Column(Text, nullable=False)
+    policy_version = Column(String(50), nullable=False)
+    rate_version = Column(String(100), nullable=False)
+    is_simulated = Column(Boolean, nullable=False, default=True)
+    created_by = Column(String(36), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    application = relationship("GoldLoanApplication", back_populates="valuations")
+
+class GoldLoanWorkflowEvent(Base):
+    __tablename__ = "gold_loan_workflow_events"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    application_id = Column(String(36), ForeignKey("gold_loan_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id = Column(String(36), nullable=False)
+    actor_name = Column(String(100), nullable=False)
+    action = Column(String(100), nullable=False)
+    details_json = Column(Text, nullable=False, default="{}")
+    is_simulated = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    application = relationship("GoldLoanApplication", back_populates="events")
+
 class EvidenceItem(Base):
     __tablename__ = "evidence_items"
     
@@ -227,3 +328,16 @@ class Invoice(Base):
     status = Column(String(50), default="Paid")
     billing_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     pdf_url = Column(String(255), nullable=True)
+
+class TenantSettings(Base):
+    __tablename__ = "tenant_settings"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    organization_name = Column(String(255), nullable=True)
+    timezone = Column(String(100), default="Asia/Kolkata (IST)")
+    default_case_owner = Column(String(100), default="Assign to team queue")
+    notification_email = Column(String(255), nullable=True)
+    sla_alert_hours = Column(Integer, default=24)
+    require_dual_approval = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
