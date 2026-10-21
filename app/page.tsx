@@ -5,13 +5,16 @@ import {
   Activity, AlertTriangle, Archive, ArrowUpRight, Bell, BookOpen, CheckCircle2, ChevronDown,
   ClipboardCheck, Clock3, FileCheck2, FolderKanban, Gauge, Inbox, LayoutDashboard,
   MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, UploadCloud, Users,
-  CreditCard, Building2, LifeBuoy, X, FileText, Download, UserPlus, Zap, Check, RefreshCw, WalletCards
+  CreditCard, Building2, LifeBuoy, X, FileText, Download, UserPlus, Zap, Check, RefreshCw, WalletCards,
+  LogIn, LogOut
 } from 'lucide-react'
-import { api, ApiSessionProfile, CaseItem, EvidenceItem, ValidationFinding, DecisionItem, AuditEventItem, AnalyticsDashboard, TeamMember, BillingSummary, AdapterStatus } from '@/lib/api'
+import { api, ApiSessionProfile, CaseItem, EvidenceItem, ValidationFinding, DecisionItem, AuditEventItem, AnalyticsDashboard, TeamMember, BillingSummary, AdapterStatus, GoldLoanApplicationItem } from '@/lib/api'
 import { IntegrationsView } from '@/components/IntegrationsView'
 import { GoldLoanStationView } from '@/components/GoldLoanStationView'
 import { VaultServicingView } from '@/components/VaultServicingView'
 import { PaymentsView } from '@/components/PaymentsView'
+import { GoldRateTicker } from '@/components/GoldRateTicker'
+import { GoldLoanCalculator } from '@/components/GoldLoanCalculator'
 
 const nav = [
   { label: 'Overview', icon: LayoutDashboard },
@@ -136,6 +139,65 @@ function Stat({
   )
 }
 
+const modulePortfolio = [
+  { name: 'Identity & access', group: 'Foundation', status: 'Partial', page: 'Team workspace', description: 'Sign-in, workspace roles and protected API access.' },
+  { name: 'Bank & branch tenancy', group: 'Foundation', status: 'Partial', page: 'Settings', description: 'Tenant boundaries exist; branch setup and scoped access remain.' },
+  { name: 'Customer records', group: 'Origination', status: 'Partial', page: 'Gold Loan LOS', description: 'Tenant-scoped profiles link by bank customer reference.' },
+  { name: 'Loan applications', group: 'Origination', status: 'Partial', page: 'Gold Loan LOS', description: 'Cases connect to persistent workflow records and event history.' },
+  { name: 'Consent & KYC', group: 'Origination', status: 'Simulator', page: 'Gold Loan LOS', description: 'Synthetic PAN and Aadhaar checks; no provider verification.' },
+  { name: 'Documents & evidence', group: 'Origination', status: 'Working', page: 'Evidence inbox', description: 'Upload, validate and retrieve tenant-scoped evidence.' },
+  { name: 'Gold inventory', group: 'Collateral', status: 'Partial', page: 'Gold Loan LOS', description: 'Single-item intake preview; durable ornament inventory is pending.' },
+  { name: 'Analyzer integration', group: 'Collateral', status: 'Simulator', page: 'Gold Loan LOS', description: 'Signed simulator readings; no physical device trust.' },
+  { name: 'Valuation & eligibility', group: 'Collateral', status: 'Partial', page: 'Gold Loan LOS', description: 'Deterministic calculation preview with sample rate inputs.' },
+  { name: 'Custody & vault', group: 'Decision & custody', status: 'Simulator', page: 'Vault & Servicing', description: 'Custody workflow preview; no physical vault events.' },
+  { name: 'Underwriting & approval', group: 'Decision & custody', status: 'Partial', page: 'My cases', description: 'Case decisions and maker-checker controls.' },
+  { name: 'Exceptions', group: 'Decision & custody', status: 'Partial', page: 'My cases', description: 'Exception records and review queues.' },
+  { name: 'LOS / LMS integration', group: 'Integrations', status: 'Planned', page: 'Integrations & settings', description: 'Adapter controls exist; bank booking APIs are not connected.' },
+  { name: 'Disbursement tracking', group: 'Integrations', status: 'Simulator', page: 'Vault & Servicing', description: 'No real payout or core banking confirmation.' },
+  { name: 'Repayments & closure', group: 'Servicing', status: 'Partial', page: 'Payments', description: 'Razorpay test checkout; no loan ledger or closure release.' },
+  { name: 'Collections & auctions', group: 'Servicing', status: 'Simulator', page: 'Vault & Servicing', description: 'Indicative previews; no scheduler, notices or auction.' },
+  { name: 'Audit & compliance', group: 'Control', status: 'Working', page: 'Audit history', description: 'Append-only hash-chain events and integrity inspection.' },
+  { name: 'Notifications & SLA', group: 'Control', status: 'Partial', page: 'System health', description: 'Operational metrics exist; delivery and SLA workflows remain.' },
+  { name: 'Analytics', group: 'Control', status: 'Working', page: 'Overview', description: 'Workspace case and validation metrics.' },
+  { name: 'SaaS subscriptions', group: 'Platform', status: 'Partial', page: 'Billing & plan', description: 'Plan and usage views; branch-based billing is pending.' },
+  { name: 'Platform administration', group: 'Platform', status: 'Partial', page: 'Settings', description: 'Workspace settings; governed policy publishing is pending.' },
+  { name: 'Security & operations', group: 'Platform', status: 'Partial', page: 'System health', description: 'Health and integration visibility; recovery operations remain.' },
+]
+
+function ModulePortfolio({ onNavigate }: { onNavigate: (page: string, name: string, status: string) => void }) {
+  const working = modulePortfolio.filter(item => item.status === 'Working').length
+  const simulator = modulePortfolio.filter(item => item.status === 'Simulator').length
+  const remaining = modulePortfolio.length - working - simulator
+  return (
+    <section className="module-portfolio panel" aria-labelledby="module-portfolio-title">
+      <div className="panel-heading module-portfolio-heading">
+        <div>
+          <span className="section-kicker">AURA WORKFLOW MAP</span>
+          <h2 id="module-portfolio-title">Gold-loan module coverage</h2>
+          <p>Open a module to continue in its current workspace. Labels reflect implementation maturity.</p>
+        </div>
+        <span className="module-count">{modulePortfolio.length} modules</span>
+      </div>
+      <div className="module-portfolio-kpis" aria-label="Module maturity summary">
+        <div><strong>{working}</strong><span>Working areas</span></div>
+        <div><strong>{simulator}</strong><span>Simulators</span></div>
+        <div><strong>{remaining}</strong><span>Partial or planned</span></div>
+      </div>
+      <div className="module-card-grid">
+        {modulePortfolio.map(item => (
+          <button className="module-card" key={item.name} onClick={() => onNavigate(item.page, item.name, item.status)}>
+            <span className="module-card-top"><span>{item.group}</span><i className={`module-status ${item.status.toLowerCase().replaceAll(' ', '-')}`}>{item.status}</i></span>
+            <strong>{item.name}</strong>
+            <small>{item.description}</small>
+            <span className="module-card-link">Open workspace <ArrowUpRight size={13} /></span>
+          </button>
+        ))}
+      </div>
+      <p className="module-portfolio-note"><ShieldCheck size={14} /> Simulated checks, rates and provider events are clearly identified and must not be treated as lending or settlement decisions.</p>
+    </section>
+  )
+}
+
 export default function Page() {
   const [active, setActive] = useState('Overview')
   const [filterOpen, setFilterOpen] = useState(false)
@@ -152,6 +214,7 @@ export default function Page() {
   const [toast, setToast] = useState('')
   const [hasApiSession, setHasApiSession] = useState(false)
   const [sessionProfile, setSessionProfile] = useState<ApiSessionProfile | null>(null)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
@@ -164,23 +227,28 @@ export default function Page() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [billing, setBilling] = useState<BillingSummary | null>(null)
   const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>([])
+  const [goldLoanApplications, setGoldLoanApplications] = useState<GoldLoanApplicationItem[]>([])
   const [adapters, setAdapters] = useState<AdapterStatus[]>([])
   const [auditVerified, setAuditVerified] = useState<boolean>(true)
+  const [goldLoanRefreshVersion, setGoldLoanRefreshVersion] = useState(0)
   const [decisionNotes, setDecisionNotes] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const profileMenuRef = useRef<HTMLDivElement>(null)
 
   // Hydrate from Python API
   const refreshData = async () => {
+    if (!api.hasAccessToken()) return
     try {
-      const [casesRes, analyticsRes, evidenceRes, teamRes, billingRes, auditRes, integrationsRes] = await Promise.all([
-        api.getCases().catch(() => initialCases),
+      const [casesRes, analyticsRes, evidenceRes, teamRes, billingRes, auditRes, integrationsRes, goldLoanRes] = await Promise.all([
+        api.getCases().catch(() => []),
         api.getAnalytics().catch(() => null),
         api.getEvidence().catch(() => []),
         api.getTeam().catch(() => []),
         api.getBilling().catch(() => null),
         api.getAuditLog(20).catch(() => []),
         api.getIntegrations().catch(() => ({ adapters: [], environment: 'development', production_enabled: false })),
+        api.getGoldLoanApplications().catch(() => []),
       ])
       if (casesRes) setCaseList(casesRes)
       if (analyticsRes) setAnalytics(analyticsRes)
@@ -189,6 +257,7 @@ export default function Page() {
       if (billingRes) setBilling(billingRes)
       if (auditRes) setAuditEvents(auditRes)
       if (integrationsRes?.adapters) setAdapters(integrationsRes.adapters)
+      setGoldLoanApplications(goldLoanRes || [])
     } catch (e) {
       console.warn('API sync using fallback defaults:', e)
     }
@@ -200,7 +269,57 @@ export default function Page() {
     refreshData()
   }, [])
 
+  useEffect(() => {
+    function handleSessionExpired() {
+      setHasApiSession(false)
+      setSessionProfile(null)
+      setCaseList(initialCases)
+      setAnalytics(null)
+      setEvidenceList([])
+      setTeamMembers([])
+      setBilling(null)
+      setAuditEvents([])
+      setGoldLoanApplications([])
+      setToast('Your session expired. Sign in again to continue working with your workspace.')
+    }
+
+    window.addEventListener('aura:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('aura:session-expired', handleSessionExpired)
+  }, [])
+
+  useEffect(() => {
+    if (!profileMenuOpen) return
+
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (event.target instanceof Node && !profileMenuRef.current?.contains(event.target)) {
+        setProfileMenuOpen(false)
+      }
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setProfileMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [profileMenuOpen])
+
+  function signOut() {
+    api.clearSession()
+    setHasApiSession(false)
+    setSessionProfile(null)
+    setProfileMenuOpen(false)
+    window.location.assign('/sign-in')
+  }
+
   function openCreateCase() {
+    if (!api.hasAccessToken()) {
+      setToast('Sign in before creating a case or gold-loan application. Use the sign-in link above.')
+      return
+    }
     setSelectedFile(null)
     setShowCreate(true)
   }
@@ -212,6 +331,11 @@ export default function Page() {
       const details = await api.getCaseDetail(id)
       setCaseDetail(details)
     } catch {
+      if (hasApiSession) {
+        setSelectedCaseId(null)
+        setToast('Unable to load this case from the workspace. Check your session and try again.')
+        return
+      }
       const found = caseList.find(c => c.id === id)
       if (found) {
         setCaseDetail({
@@ -227,8 +351,8 @@ export default function Page() {
   // Submit new case
   async function submitCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (active === 'Gold Loan LOS' && !hasApiSession) {
-      setToast('Sign in before creating a gold-loan intake record.')
+    if (!api.hasAccessToken()) {
+      setToast('Your session is missing or expired. Sign in before creating this application.')
       return
     }
     setCreating(true)
@@ -246,6 +370,20 @@ export default function Page() {
         purpose,
         product_type: isGoldLoan ? 'Gold Loan' : 'Asset finance'
       })
+
+      if (isGoldLoan) {
+        await api.createGoldLoanApplication(
+          newCase.id,
+          String(data.get('customerReference') || '').trim() || undefined,
+          {
+            item_type: String(data.get('goldItemType')),
+            gross_weight_mg: Math.round(Number(data.get('goldWeightGrams')) * 1000),
+            stone_deduction_mg: 0,
+            purity_bps: Number(data.get('goldPurity')),
+          }
+        )
+        setGoldLoanRefreshVersion(version => version + 1)
+      }
 
       // If user selected a file during creation, upload it to the newly created case
       if (selectedFile) {
@@ -267,6 +405,10 @@ export default function Page() {
   // Execute Validation Rules on open case
   async function handleRunValidation() {
     if (!selectedCaseId) return
+    if (!api.hasAccessToken()) {
+      setToast('Sign in before running validation.')
+      return
+    }
     setLoadingAction(true)
     try {
       const res = await api.runValidation(selectedCaseId)
@@ -285,6 +427,10 @@ export default function Page() {
   // Record Maker-Checker Decision
   async function handleRecordDecision(outcome: string) {
     if (!selectedCaseId) return
+    if (!api.hasAccessToken()) {
+      setToast('Sign in before recording a decision.')
+      return
+    }
     setLoadingAction(true)
     try {
       await api.recordDecision({
@@ -307,6 +453,10 @@ export default function Page() {
 
   // File upload directly to evidence inbox
   async function handleFileUpload(file: File) {
+    if (!api.hasAccessToken()) {
+      setToast('Sign in before uploading evidence.')
+      return
+    }
     setLoadingAction(true)
     try {
       const targetCaseId = selectedCaseId || (caseList.length > 0 ? caseList[0].id : undefined)
@@ -323,13 +473,17 @@ export default function Page() {
 
   // Verify Audit Log Integrity
   async function handleVerifyAudit() {
+    if (!api.hasAccessToken()) {
+      setToast('Sign in before verifying workspace audit history.')
+      return
+    }
     setLoadingAction(true)
     try {
       const res = await api.verifyAuditIntegrity()
       setAuditVerified(res.is_valid)
       setToast(`Audit trail verified: ${res.total_events} events cryptographically linked. Tampering: 0`)
-    } catch {
-      setToast('Verified tamper-evident chain')
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Unable to verify audit history.')
     } finally {
       setLoadingAction(false)
       setTimeout(() => setToast(''), 3500)
@@ -339,6 +493,10 @@ export default function Page() {
   // Invite member
   async function handleInviteMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!api.hasAccessToken()) {
+      setToast('Sign in before inviting a workspace member.')
+      return
+    }
     setLoadingAction(true)
     const data = new FormData(event.currentTarget)
     try {
@@ -424,6 +582,9 @@ export default function Page() {
   const pendingValidationShare = kpis.open_cases > 0 ? kpis.pending_validation / kpis.open_cases * 100 : 0
   const awaitingDecisionShare = kpis.open_cases > 0 ? kpis.awaiting_decision / kpis.open_cases * 100 : 0
   const openExceptionsShare = kpis.open_cases > 0 ? kpis.open_exceptions / kpis.open_cases * 100 : 0
+  const goldConsentPending = goldLoanApplications.filter(application => application.consent_status !== 'RECORDED').length
+  const goldVerificationReview = goldLoanApplications.filter(application => application.kyc_status === 'INDETERMINATE').length
+  const goldValuationPreviews = goldLoanApplications.filter(application => application.appraisal_status === 'SIMULATED_PREVIEW').length
 
   return (
     <div className="app-shell">
@@ -510,7 +671,43 @@ export default function Page() {
               <Bell size={18} />
               <i />
             </button>
-            <div className="top-avatar">{sessionProfile?.user.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'JD'}</div>
+            <div className="profile-menu-wrap" ref={profileMenuRef}>
+              <button
+                className="top-avatar profile-menu-trigger"
+                type="button"
+                aria-label={hasApiSession ? `Account menu for ${sessionProfile?.user.name || 'your account'}` : 'Sign-in menu'}
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                onClick={() => setProfileMenuOpen(open => !open)}
+              >
+                {sessionProfile?.user.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'JD'}
+              </button>
+              {profileMenuOpen && (
+                <div className="profile-menu" role="menu" aria-label="Account">
+                  {hasApiSession ? (
+                    <>
+                      <div className="profile-menu-details">
+                        <strong>{sessionProfile?.user.name || 'Signed-in user'}</strong>
+                        <span>{sessionProfile?.user.email || 'Authenticated workspace session'}</span>
+                        {sessionProfile?.tenant.name && <span>{sessionProfile.tenant.name}</span>}
+                      </div>
+                      <button className="profile-menu-action" type="button" role="menuitem" onClick={signOut}>
+                        <LogOut size={15} /> Sign out
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <a className="profile-menu-action" href="/sign-in" role="menuitem" onClick={() => setProfileMenuOpen(false)}>
+                        <LogIn size={15} /> Sign in
+                      </a>
+                      <a className="profile-menu-action" href="/sign-up" role="menuitem" onClick={() => setProfileMenuOpen(false)}>
+                        <UserPlus size={15} /> Create account
+                      </a>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -538,11 +735,12 @@ export default function Page() {
             </section>
           )}
 
-          {['Gold Loan LOS', 'Vault & Servicing', 'Payments', 'Integrations & settings'].includes(active) && !hasApiSession && (
+          {!hasApiSession && (
             <div className="auth-required-banner" role="status">
               <ShieldCheck size={17} />
-              <span>Sign in to enable protected workflow actions.</span>
+              <span>You are viewing preview data. Sign in to create records and access your workspace.</span>
               <a href="/sign-in">Sign in</a>
+              <a href="/sign-up">Create account</a>
             </div>
           )}
 
@@ -559,6 +757,23 @@ export default function Page() {
                 </div>
                 <button className="primary-button" onClick={openCreateCase}>
                   <Plus size={17} /> Create case
+                </button>
+              </section>
+
+              <GoldRateTicker />
+
+              <section className="gold-overview-strip" aria-label="Gold loan workflow KPIs">
+                <button onClick={() => go('Gold Loan LOS')}>
+                  <span>GOLD LOAN APPLICATIONS</span><strong>{goldLoanApplications.length}</strong><small>Saved in this workspace</small>
+                </button>
+                <button onClick={() => go('Gold Loan LOS')}>
+                  <span>CONSENT PENDING</span><strong>{goldConsentPending}</strong><small>Awaiting recorded consent</small>
+                </button>
+                <button onClick={() => go('Gold Loan LOS')}>
+                  <span>VERIFICATION REVIEW</span><strong>{goldVerificationReview}</strong><small>Simulator results stay indeterminate</small>
+                </button>
+                <button onClick={() => go('Gold Loan LOS')}>
+                  <span>VALUATION PREVIEWS</span><strong>{goldValuationPreviews}</strong><small>Saved simulator snapshots</small>
                 </button>
               </section>
 
@@ -637,6 +852,11 @@ export default function Page() {
                   <ArrowUpRight size={16} />
                 </button>
               </section>
+
+              <ModulePortfolio onNavigate={(page, name, status) => {
+                if (page !== 'Overview') go(page)
+                if (status !== 'Working') setToast(`${name}: ${status.toLowerCase()} in this prototype. See the module TODO plan for remaining work.`)
+              }} />
             </>
           )}
 
@@ -909,10 +1129,15 @@ export default function Page() {
           )}
 
           {active === 'Gold Loan LOS' && (
-            <GoldLoanStationView
-              setToast={setToast}
-              hasApiSession={hasApiSession}
-            />
+            <>
+              <GoldRateTicker />
+              <GoldLoanCalculator setToast={setToast} />
+              <GoldLoanStationView
+                setToast={setToast}
+                hasApiSession={hasApiSession}
+                refreshVersion={goldLoanRefreshVersion}
+              />
+            </>
           )}
 
           {active === 'Vault & Servicing' && (
@@ -978,12 +1203,16 @@ export default function Page() {
               {active === 'Gold Loan LOS' && (
                 <>
                   <label>
+                    Bank customer reference <span className="optional-label">(optional; reuses profile within this bank)</span>
+                    <input name="customerReference" maxLength={100} placeholder="e.g. CIF-0091827" />
+                  </label>
+                  <label>
                     Gold item type
-                    <select name="goldItemType" defaultValue="Gold jewellery">
-                      <option>Gold jewellery</option>
-                      <option>Gold coins / bullion</option>
-                      <option>Gold chain</option>
-                      <option>Gold bangle</option>
+                    <select name="goldItemType" defaultValue="Gold Bangle">
+                      <option>Gold Bangle</option>
+                      <option>Gold Coins / Bullion</option>
+                      <option>Gold Chain</option>
+                      <option>Gold Necklace</option>
                     </select>
                   </label>
                   <label>
@@ -1830,47 +2059,165 @@ function SearchExportView({ cases }: { cases: CaseItem[] }) {
 
 /* SETTINGS VIEW */
 function SettingsView() {
+  const [settingsTab, setSettingsTab] = useState('General')
+  const [orgName, setOrgName] = useState('')
+  const [timezone, setTimezone] = useState('Asia/Kolkata (IST)')
+  const [defaultOwner, setDefaultOwner] = useState('Assign to team queue')
+  const [notifEmail, setNotifEmail] = useState('')
+  const [slaHours, setSlaHours] = useState(24)
+  const [dualApproval, setDualApproval] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [settingsToast, setSettingsToast] = useState('')
+
+  useEffect(() => {
+    api.getWorkspaceSettings().then(s => {
+      setOrgName(s.organization_name || '')
+      setTimezone(s.timezone || 'Asia/Kolkata (IST)')
+      setDefaultOwner(s.default_case_owner || 'Assign to team queue')
+      setNotifEmail(s.notification_email || '')
+      setSlaHours(s.sla_alert_hours ?? 24)
+      setDualApproval(s.require_dual_approval ?? true)
+      setSavedAt(s.updated_at)
+    }).catch(() => {})
+  }, [])
+
+  async function handleSave(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!api.hasAccessToken()) {
+      setSettingsToast('Sign in before saving workspace settings.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await api.updateWorkspaceSettings({
+        organization_name: orgName,
+        timezone,
+        default_case_owner: defaultOwner,
+        notification_email: notifEmail || undefined,
+        sla_alert_hours: slaHours,
+        require_dual_approval: dualApproval,
+      })
+      setSavedAt(res.updated_at)
+      setSettingsToast('Settings saved successfully.')
+    } catch (err: any) {
+      setSettingsToast(err.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
+      setTimeout(() => setSettingsToast(''), 3000)
+    }
+  }
+
+  const tabs = ['General', 'Notifications', 'Security & SSO', 'Data retention', 'Integrations']
+
   return (
     <SubPage
       title="Settings"
       subtitle="Configure workspace defaults, notifications and security controls."
     >
+      {settingsToast && (
+        <div className="toast" style={{ position: 'relative', right: 'auto', bottom: 'auto', marginBottom: '16px', display: 'flex' }}>
+          <CheckCircle2 size={16} /> {settingsToast}
+        </div>
+      )}
       <div className="settings-layout">
         <div className="settings-nav">
-          <button className="selected">General</button>
-          <button>Notifications</button>
-          <button>Security & SSO</button>
-          <button>Data retention</button>
-          <button>Integrations</button>
+          {tabs.map(t => (
+            <button key={t} className={settingsTab === t ? 'selected' : ''} onClick={() => setSettingsTab(t)}>{t}</button>
+          ))}
         </div>
-        <div className="panel settings-form">
-          <h2>General settings</h2>
-          <p>Update the identity and default behaviour of your workspace.</p>
-          <label>
-            Organisation name
-            <input value="Northstar Bank" readOnly />
-          </label>
-          <label>
-            Workspace timezone
-            <select defaultValue="Europe/London (GMT+1)">
-              <option value="Europe/London (GMT+1)">Europe/London (GMT+1)</option>
-              <option value="America/New_York (EST)">America/New_York (EST)</option>
-              <option value="Asia/Kolkata (IST)">Asia/Kolkata (IST)</option>
-            </select>
-          </label>
-          <label>
-            Default case owner
-            <select defaultValue="Assign to team queue">
-              <option value="Assign to team queue">Assign to team queue</option>
-              <option value="M. Chen">M. Chen</option>
-              <option value="S. Patel">S. Patel</option>
-            </select>
-          </label>
-          <div className="form-footer">
-            <span>Last synchronized with Python backend 2 minutes ago</span>
-            <button className="primary-button">Save changes</button>
+        {settingsTab === 'General' && (
+          <div className="panel settings-form">
+            <h2>General settings</h2>
+            <p>Update the identity and default behaviour of your workspace.</p>
+            <form onSubmit={handleSave}>
+              <label>
+                Organisation name
+                <input value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="e.g. Northstar Bank" required />
+              </label>
+              <label>
+                Workspace timezone
+                <select value={timezone} onChange={e => setTimezone(e.target.value)}>
+                  <option value="Asia/Kolkata (IST)">Asia/Kolkata (IST)</option>
+                  <option value="Europe/London (GMT+1)">Europe/London (GMT+1)</option>
+                  <option value="America/New_York (EST)">America/New_York (EST)</option>
+                  <option value="Asia/Dubai (GST)">Asia/Dubai (GST)</option>
+                </select>
+              </label>
+              <label>
+                Default case owner
+                <select value={defaultOwner} onChange={e => setDefaultOwner(e.target.value)}>
+                  <option value="Assign to team queue">Assign to team queue</option>
+                  <option value="M. Chen">M. Chen</option>
+                  <option value="S. Patel">S. Patel</option>
+                  <option value="A. Rossi">A. Rossi</option>
+                  <option value="J. Okafor">J. Okafor</option>
+                </select>
+              </label>
+              <label>
+                SLA alert threshold (hours)
+                <input type="number" min={1} max={168} value={slaHours} onChange={e => setSlaHours(Number(e.target.value))} />
+              </label>
+              <label style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginTop: '18px' }}>
+                <input type="checkbox" checked={dualApproval} onChange={e => setDualApproval(e.target.checked)} style={{ width: '16px', height: '16px' }} />
+                Require dual-approval (maker-checker) for all decisions
+              </label>
+              <div className="form-footer">
+                <span>{savedAt ? `Last saved: ${new Date(savedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}` : 'Not yet saved to backend'}</span>
+                <button className="primary-button" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+            </form>
           </div>
-        </div>
+        )}
+        {settingsTab === 'Notifications' && (
+          <div className="panel settings-form">
+            <h2>Notification settings</h2>
+            <p>Configure alert delivery for SLA breaches and exception escalations.</p>
+            <label>
+              Alert email address
+              <input type="email" value={notifEmail} onChange={e => setNotifEmail(e.target.value)} placeholder="ops-alerts@yourbank.com" />
+            </label>
+            <div className="form-footer">
+              <span>Email alerts are queued; delivery requires an SMTP adapter in Integrations.</span>
+              <button className="primary-button" type="button" disabled={saving} onClick={async () => {
+                setSaving(true)
+                try {
+                  await api.updateWorkspaceSettings({ notification_email: notifEmail || undefined })
+                  setSettingsToast('Notification settings saved.')
+                } catch { setSettingsToast('Save failed') }
+                finally { setSaving(false); setTimeout(() => setSettingsToast(''), 3000) }
+              }}>{saving ? 'Saving…' : 'Save'}</button>
+            </div>
+          </div>
+        )}
+        {settingsTab === 'Security & SSO' && (
+          <div className="panel settings-form">
+            <h2>Security &amp; SSO</h2>
+            <p>JWT-based session management is active. SSO provider integration is planned.</p>
+            <div style={{ background: '#f6f9ff', border: '1px solid #d5e4fc', borderRadius: '7px', padding: '16px', marginTop: '16px', fontSize: '11px', color: '#3d6299' }}>
+              <strong style={{ display: 'block', marginBottom: '6px' }}>Current security posture</strong>
+              JWT bearer tokens · bcrypt password hashing · Multi-tenant RBAC · Append-only audit trail with SHA-256 hash chaining
+            </div>
+          </div>
+        )}
+        {settingsTab === 'Data retention' && (
+          <div className="panel settings-form">
+            <h2>Data retention</h2>
+            <p>Audit events are retained for 7 years per RBI compliance requirements. Evidence files follow the same schedule.</p>
+            <div style={{ background: '#f6f9ff', border: '1px solid #d5e4fc', borderRadius: '7px', padding: '16px', marginTop: '16px', fontSize: '11px', color: '#3d6299' }}>
+              <strong style={{ display: 'block', marginBottom: '6px' }}>Retention policy</strong>
+              Audit events: 7 years · Evidence files: 7 years · Case records: 7 years · Payment orders: 10 years
+            </div>
+          </div>
+        )}
+        {settingsTab === 'Integrations' && (
+          <div className="panel settings-form">
+            <h2>Integration overrides</h2>
+            <p>Manage adapter modes and API keys in the <strong>Integrations &amp; settings</strong> workspace.</p>
+          </div>
+        )}
       </div>
     </SubPage>
   )
