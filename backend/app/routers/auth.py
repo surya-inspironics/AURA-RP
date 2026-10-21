@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 from backend.app.database.session import get_db
 from backend.app.models.entities import User, Tenant, Membership
 from backend.app.models.schemas import UserRegister, UserLogin, TokenResponse
 from backend.app.core.security import hash_password, verify_password, create_access_token
-from backend.app.routers.deps import get_current_tenant_and_user
+from backend.app.routers.deps import require_authenticated_tenant_and_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -39,7 +38,7 @@ def register_user(data: UserRegister, db: Session = Depends(get_db)):
     db.add(membership)
     db.commit()
 
-    token = create_access_token({"sub": user.id, "tenant_id": tenant.id, "role": "owner"})
+    token = create_access_token({"sub": user.id, "tenant_id": tenant.id})
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -50,23 +49,30 @@ def register_user(data: UserRegister, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 def login_user(data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email.lower()).first()
-    if not user or not verify_password(data.password, user.hashed_password):
+    if not user or not user.is_active or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    mem = db.query(Membership).filter(Membership.user_id == user.id).first()
-    tenant = db.query(Tenant).filter(Tenant.id == mem.tenant_id).first() if mem else db.query(Tenant).first()
-    role = mem.role if mem else "member"
+    mem = db.query(Membership).filter(
+        Membership.user_id == user.id
+    ).order_by(Membership.created_at.asc(), Membership.id.asc()).first()
+    if not mem:
+        raise HTTPException(status_code=403, detail="User is not a member of a workspace")
 
-    token = create_access_token({"sub": user.id, "tenant_id": tenant.id if tenant else None, "role": role})
+    tenant = db.query(Tenant).filter(Tenant.id == mem.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=403, detail="Workspace membership is invalid")
+    role = mem.role.lower()
+
+    token = create_access_token({"sub": user.id, "tenant_id": tenant.id})
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": {"id": user.id, "email": user.email, "name": user.full_name, "role": role},
-        "tenant": {"id": tenant.id if tenant else "", "name": tenant.name if tenant else "", "slug": tenant.slug if tenant else ""}
+        "tenant": {"id": tenant.id, "name": tenant.name, "slug": tenant.slug}
     }
 
 @router.get("/me")
-def get_me(ctx=Depends(get_current_tenant_and_user)):
+def get_me(ctx=Depends(require_authenticated_tenant_and_user)):
     tenant, user, role = ctx
     return {
         "user": {

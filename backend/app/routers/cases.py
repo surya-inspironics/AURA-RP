@@ -5,7 +5,7 @@ from backend.app.database.session import get_db
 from backend.app.models.entities import Case, EvidenceItem, ValidationFinding, Decision
 from backend.app.models.schemas import CaseCreate, CaseResponse, CaseUpdate
 from backend.app.services.case_service import CaseService
-from backend.app.routers.deps import get_current_tenant_and_user
+from backend.app.routers.deps import get_current_tenant_and_user, OPERATIONAL_ROLES, require_any_role
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
 
@@ -67,7 +67,7 @@ def list_cases(
 @router.post("/", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
 def create_case(
     payload: CaseCreate,
-    ctx=Depends(get_current_tenant_and_user),
+    ctx=Depends(require_any_role(OPERATIONAL_ROLES)),
     db: Session = Depends(get_db)
 ):
     tenant, user, role = ctx
@@ -184,7 +184,7 @@ def transition_case_status(
     case_id: str,
     target_status: str = Query(..., description="Target status for transition"),
     reason: Optional[str] = Query(None),
-    ctx=Depends(get_current_tenant_and_user),
+    ctx=Depends(require_any_role(OPERATIONAL_ROLES)),
     db: Session = Depends(get_db)
 ):
     tenant, user, role = ctx

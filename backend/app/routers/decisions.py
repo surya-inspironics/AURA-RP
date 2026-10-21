@@ -5,14 +5,14 @@ from backend.app.database.session import get_db
 from backend.app.models.entities import Decision, Case
 from backend.app.models.schemas import DecisionCreate, DecisionResponse
 from backend.app.services.decision_service import DecisionService
-from backend.app.routers.deps import get_current_tenant_and_user
+from backend.app.routers.deps import get_current_tenant_and_user, APPROVER_ROLES, require_any_role
 
 router = APIRouter(prefix="/decisions", tags=["Decision Records"])
 
 @router.post("/", response_model=DecisionResponse, status_code=status.HTTP_201_CREATED)
 def record_decision(
     payload: DecisionCreate,
-    ctx=Depends(get_current_tenant_and_user),
+    ctx=Depends(require_any_role(APPROVER_ROLES)),
     db: Session = Depends(get_db)
 ):
     tenant, user, role = ctx

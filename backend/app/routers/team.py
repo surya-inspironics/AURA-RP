@@ -4,9 +4,8 @@ from typing import List
 from backend.app.database.session import get_db
 from backend.app.models.entities import User, Membership
 from backend.app.models.schemas import MemberInvite, MemberResponse
-from backend.app.core.security import hash_password
 from backend.app.services.audit_service import AuditService
-from backend.app.routers.deps import get_current_tenant_and_user
+from backend.app.routers.deps import get_current_tenant_and_user, require_workspace_admin
 
 router = APIRouter(prefix="/team", tags=["Team & Workspace Management"])
 
@@ -38,26 +37,17 @@ def list_team_members(
 @router.post("/invite", response_model=MemberResponse, status_code=status.HTTP_201_CREATED)
 def invite_member(
     payload: MemberInvite,
-    ctx=Depends(get_current_tenant_and_user),
+    ctx=Depends(require_workspace_admin),
     db: Session = Depends(get_db)
 ):
     tenant, user, role = ctx
-    if role not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="Only workspace Owners or Administrators can invite new members")
 
     # Check if user already exists
     u = db.query(User).filter(User.email == payload.email.lower()).first()
     if not u:
-        initials = "".join([p[0].upper() for p in payload.full_name.split()[:2]]) or "TM"
-        u = User(
-            email=payload.email.lower(),
-            hashed_password=hash_password("AuraWelcome2026!"),
-            full_name=payload.full_name,
-            avatar_initials=initials,
-            is_active=True
-        )
-        db.add(u)
-        db.flush()
+        raise HTTPException(status_code=503, detail="New-user invitations are unavailable until a verified activation flow is configured")
+    if not u.is_active:
+        raise HTTPException(status_code=409, detail="Inactive users cannot be added to a workspace")
 
     existing_mem = db.query(Membership).filter(
         Membership.tenant_id == tenant.id,

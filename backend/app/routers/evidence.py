@@ -7,7 +7,7 @@ from backend.app.database.session import get_db
 from backend.app.models.entities import EvidenceItem, Case
 from backend.app.models.schemas import EvidenceResponse
 from backend.app.services.evidence_service import EvidenceService
-from backend.app.routers.deps import get_current_tenant_and_user
+from backend.app.routers.deps import get_current_tenant_and_user, OPERATIONAL_ROLES, require_any_role
 
 router = APIRouter(prefix="/evidence", tags=["Evidence Ingestion"])
 
@@ -27,7 +27,7 @@ def list_evidence(
 async def upload_evidence(
     file: UploadFile = File(...),
     case_id: Optional[str] = Form(None),
-    ctx=Depends(get_current_tenant_and_user),
+    ctx=Depends(require_any_role(OPERATIONAL_ROLES)),
     db: Session = Depends(get_db)
 ):
     tenant, user, role = ctx

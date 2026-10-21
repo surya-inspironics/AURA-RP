@@ -35,24 +35,20 @@ def update_adapter_mode(adapter_name: str, payload: ModeUpdateRequest):
     Switches an adapter's operational mode (MOCK, SANDBOX, PRODUCTION).
     Enforces server-side credentials and safety policies.
     """
-    try:
-        updated = adapter_registry.set_mode(adapter_name, payload.mode)
-        return updated
-    except PermissionError as pe:
-        raise HTTPException(status_code=403, detail=str(pe))
-    except (ValueError, KeyError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    raise HTTPException(
+        status_code=403,
+        detail="Integration modes are deployment-scoped and cannot be changed by a tenant workspace.",
+    )
 
 @router.post("/{adapter_name}/simulate-failure", dependencies=[Depends(require_workspace_admin)])
 def simulate_adapter_failure(adapter_name: str, payload: SimulateFailureRequest):
     """
     Injects a resilience test failure scenario for non-production environments.
     """
-    try:
-        updated = adapter_registry.simulate_failure(adapter_name, payload.scenario)
-        return updated
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    raise HTTPException(
+        status_code=403,
+        detail="Integration failure simulation is deployment-scoped and cannot be changed by a tenant workspace.",
+    )
 
 @router.post("/{adapter_name}/test-connection")
 def test_adapter_connection(adapter_name: str):

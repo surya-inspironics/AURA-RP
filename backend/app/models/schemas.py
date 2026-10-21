@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 # Auth Schemas
@@ -196,7 +196,7 @@ class AnalyticsDashboard(BaseModel):
 class MemberInvite(BaseModel):
     email: EmailStr
     full_name: str
-    role: str = "reviewer"
+    role: Literal["admin", "manager", "reviewer", "approver", "analyst", "auditor"] = "reviewer"
 
 class MemberResponse(BaseModel):
     id: str

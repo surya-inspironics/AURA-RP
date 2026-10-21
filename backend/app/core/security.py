@@ -27,7 +27,18 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"require": ["sub", "tenant_id", "exp", "iat"]},
+        )
+        if not isinstance(payload, dict):
+            return None
+        if not isinstance(payload.get("sub"), str) or not payload["sub"]:
+            return None
+        if not isinstance(payload.get("tenant_id"), str) or not payload["tenant_id"]:
+            return None
         return payload
-    except Exception:
+    except jwt.PyJWTError:
         return None

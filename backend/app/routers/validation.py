@@ -5,14 +5,14 @@ from backend.app.database.session import get_db
 from backend.app.models.entities import ValidationFinding, Case
 from backend.app.models.schemas import ValidationRunRequest, ValidationResult, FindingResponse
 from backend.app.services.validation_service import ValidationService
-from backend.app.routers.deps import get_current_tenant_and_user
+from backend.app.routers.deps import get_current_tenant_and_user, OPERATIONAL_ROLES, require_any_role
 
 router = APIRouter(prefix="/validation", tags=["Validation & Rules Engine"])
 
 @router.post("/run", response_model=ValidationResult)
 def run_validation(
     payload: ValidationRunRequest,
-    ctx=Depends(get_current_tenant_and_user),
+    ctx=Depends(require_any_role(OPERATIONAL_ROLES)),
     db: Session = Depends(get_db)
 ):
     tenant, user, role = ctx

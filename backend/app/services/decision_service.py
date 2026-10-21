@@ -22,11 +22,19 @@ class DecisionService:
         if not case:
             raise ValueError("Case not found")
 
-        # Maker-checker policy check: Approver cannot be the same user who created the application
-        # If in single-user demo environment, we record an audit note if creator is approving
-        maker_checker_override = False
         if case.created_by == actor_id and outcome == "APPROVED":
-            maker_checker_override = True
+            raise ValueError("Maker-checker control: the application creator cannot approve their own case")
+
+        if case.product_type.lower() == "gold loan" and outcome == "APPROVED":
+            from backend.app.models.entities import GoldLoanApplication
+            gold_application = db.query(GoldLoanApplication).filter(
+                GoldLoanApplication.case_id == case.id,
+                GoldLoanApplication.tenant_id == tenant_id,
+            ).first()
+            if not gold_application:
+                raise ValueError("Gold-loan workflow record is required before approval")
+            if gold_application.consent_status != "RECORDED" or gold_application.kyc_status != "VERIFIED" or gold_application.appraisal_status != "VERIFIED":
+                raise ValueError("Gold-loan approval is blocked until consent, provider-verified KYC and trusted appraisal are complete")
 
         now = datetime.now(timezone.utc)
         decision = Decision(
@@ -69,7 +77,7 @@ class DecisionService:
                 "outcome": outcome,
                 "eligible_amount": decision.eligible_amount,
                 "rationale": rationale,
-                "maker_checker_self_approval": maker_checker_override
+                "maker_checker_self_approval": False
             }
         )
         db.commit()
