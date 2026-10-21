@@ -2,7 +2,7 @@
 
 import Script from 'next/script'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, ArrowDownToLine, CreditCard, IndianRupee, ShieldCheck } from 'lucide-react'
+import { Activity, ArrowDownToLine, CheckCircle2, CreditCard, IndianRupee, Lock, ShieldCheck } from 'lucide-react'
 import { api, type RepaymentOrder } from '@/lib/api'
 
 interface PaymentsViewProps {
@@ -385,6 +385,92 @@ export function PaymentsView({ hasApiSession, setToast }: PaymentsViewProps) {
           )}
         </form>
       </div>
+
+      <LoanClosurePanel hasApiSession={hasApiSession} setToast={setToast} />
     </section>
+  )
+}
+
+function LoanClosurePanel({ hasApiSession, setToast }: { hasApiSession: boolean; setToast: (m: string) => void }) {
+  const [closeLoanId, setCloseLoanId] = useState('')
+  const [closePrincipal, setClosePrincipal] = useState('')
+  const [closeInterest, setCloseInterest] = useState('')
+  const [closePenal, setClosePenal] = useState('')
+  const [closeResult, setCloseResult] = useState<{ release_authorization_token: string; closed_at: string; message: string } | null>(null)
+  const [closing, setClosing] = useState(false)
+
+  async function handleCloseLoan(e: React.FormEvent) {
+    e.preventDefault()
+    if (!hasApiSession) { setToast('Sign in to execute loan closure.'); return }
+    const principal = Math.round(Number(closePrincipal) * 100)
+    const interest = Math.round(Number(closeInterest) * 100)
+    const penal = Math.round(Number(closePenal) * 100)
+    if (!closeLoanId.trim() || principal <= 0) {
+      setToast('Enter a loan reference and positive outstanding balance.')
+      return
+    }
+    setClosing(true)
+    try {
+      const res = await fetch('/api/v1/gold-loan/servicing/close-and-release', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(typeof window !== 'undefined' && localStorage.getItem('aura_token')
+            ? { Authorization: `Bearer ${localStorage.getItem('aura_token')}` }
+            : {})
+        },
+        body: JSON.stringify({
+          loan_id: closeLoanId.trim(),
+          outstanding_principal_paise: principal,
+          outstanding_interest_paise: interest,
+          penal_charges_paise: penal,
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || 'Closure rejected')
+      }
+      const data = await res.json()
+      setCloseResult(data)
+      setToast('Loan closed. Release token generated — collateral can now be returned to the customer.')
+    } catch (err: any) {
+      setToast(err.message || 'Loan closure failed')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  return (
+    <div className="payment-lower-grid" style={{ marginTop: '18px' }}>
+      <form className="panel payment-form" onSubmit={handleCloseLoan} style={{ gridColumn: '1 / -1' }}>
+        <div className="panel-heading">
+          <div>
+            <h2>Loan closure &amp; gold release</h2>
+            <p>Validate full repayment and generate a collateral release authorisation token</p>
+          </div>
+          <Lock size={19} />
+        </div>
+        <div className="allocation-input-grid">
+          <label>Loan reference<input value={closeLoanId} onChange={e => setCloseLoanId(e.target.value)} placeholder="e.g. LOAN-2026-001" required /></label>
+          <label>Outstanding principal (₹)<input type="number" min="0.01" step="0.01" value={closePrincipal} onChange={e => setClosePrincipal(e.target.value)} required /></label>
+          <label>Accrued interest (₹)<input type="number" min="0" step="0.01" value={closeInterest} onChange={e => setCloseInterest(e.target.value)} /></label>
+          <label>Penal charges (₹)<input type="number" min="0" step="0.01" value={closePenal} onChange={e => setClosePenal(e.target.value)} /></label>
+        </div>
+        <button className="primary-button payment-submit" type="submit" disabled={!hasApiSession || closing}>
+          <CheckCircle2 size={15} /> {closing ? 'Processing closure…' : 'Close loan & release gold'}
+        </button>
+        {closeResult && (
+          <div className="closure-result" role="status">
+            <div className="closure-token">
+              <Lock size={14} />
+              <span>Release authorisation token</span>
+              <strong>{closeResult.release_authorization_token}</strong>
+            </div>
+            <small>{closeResult.message}</small>
+          </div>
+        )}
+        <small className="payment-form-note">This is a simulator — no physical vault event or bank ledger entry is triggered. The token is cryptographically unique and audit-logged.</small>
+      </form>
+    </div>
   )
 }

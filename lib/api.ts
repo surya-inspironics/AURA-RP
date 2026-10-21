@@ -175,8 +175,20 @@ export interface ValuationResponse {
     rate_version: string
     gold_rate_per_gram_paise: number
   }
-  limits_comparison_paise: Record<string, number>
-  limits_comparison_inr: Record<string, number>
+  limits_comparison_paise: {
+    COLLATERAL_LTV_LIMIT: number
+    BORROWER_CREDIT_LIMIT: number
+    INCOME_CAPACITY_LIMIT: number
+    PRODUCT_SCHEME_CAP: number
+    GROUP_EXPOSURE_LIMIT: number
+  }
+  limits_comparison_inr: {
+    COLLATERAL_LTV_LIMIT: number
+    BORROWER_CREDIT_LIMIT: number
+    INCOME_CAPACITY_LIMIT: number
+    PRODUCT_SCHEME_CAP: number
+    GROUP_EXPOSURE_LIMIT: number
+  }
   item_traces: Array<{
     item_number: number
     item_type: string
@@ -221,6 +233,49 @@ export interface RepaymentOrder {
   idempotent_replay?: boolean
 }
 
+export interface GoldRateInfo {
+  karat: string
+  rate_per_gram_inr: number
+  rate_per_gram_paise: number
+  rate_per_mg_paise: number
+  is_live: boolean
+  is_stale: boolean
+  source: string
+  rate_version: string
+  published_at: number
+}
+
+export interface AllGoldRates {
+  rates: Record<string, { paise_per_gram: number; inr_per_gram: number }>
+  source: string
+  is_live: boolean
+  rate_version: string
+  cached_at: number
+  cache_age_seconds: number
+}
+
+export interface GoldLoanApplicationItem {
+  id: string
+  case_id: string
+  customer_id: string
+  external_customer_reference: string | null
+  case_number: string
+  customer_name: string
+  requested_amount: number
+  branch_reference: string | null
+  stage: string
+  consent_status: string
+  kyc_status: string
+  appraisal_status: string
+  decision_status: string
+  collateral_items: Array<{ id: string; item_reference: string; item_type: string; gross_weight_mg: number; stone_deduction_mg: number; purity_bps: number; source: string; is_simulated: boolean }>
+  consents: Array<{ id: string; purpose: string; wording_version: string; capture_method: string; accepted: boolean; created_at: string }>
+  valuations: Array<{ id: string; result: ValuationResponse; policy_version: string; rate_version: string; is_simulated: boolean; created_at: string }>
+  events: Array<{ id: string; actor_name: string; action: string; details: Record<string, any>; is_simulated: boolean; created_at: string }>
+  created_at: string
+  updated_at: string
+}
+
 function getHeaders(): HeadersInit {
   const headers: Record<string, string> = {
     'Accept': 'application/json'
@@ -232,6 +287,29 @@ function getHeaders(): HeadersInit {
     }
   }
   return headers
+}
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const response = await globalThis.fetch(input, init)
+  const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  const publicEndpoint = /\/auth\/(login|register)(?:\?|$)/.test(requestUrl)
+    || requestUrl.includes('/gold-loan/rates/live')
+
+  if (response.status === 401 && !publicEndpoint && typeof window !== 'undefined') {
+    const hadSession = Boolean(localStorage.getItem('aura_token'))
+    localStorage.removeItem('aura_token')
+    localStorage.removeItem('aura_profile')
+    if (hadSession) window.dispatchEvent(new Event('aura:session-expired'))
+    return new Response(
+      JSON.stringify({ detail: 'Your session is missing or expired. Sign in to continue.' }),
+      {
+        status: response.status,
+        statusText: response.statusText,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  }
+  return response
 }
 
 export const api = {
@@ -254,8 +332,13 @@ export const api = {
     localStorage.setItem('aura_profile', JSON.stringify({ user: session.user, tenant: session.tenant }))
   },
 
+  clearSession(): void {
+    localStorage.removeItem('aura_token')
+    localStorage.removeItem('aura_profile')
+  },
+
   async login(email: string, password: string): Promise<ApiAuthResponse> {
-    const res = await fetch(`${BASE_URL}/auth/login`, {
+    const res = await apiFetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -268,7 +351,7 @@ export const api = {
   },
 
   async register(data: { email: string; password: string; full_name: string; organization_name?: string }): Promise<ApiAuthResponse> {
-    const res = await fetch(`${BASE_URL}/auth/register`, {
+    const res = await apiFetch(`${BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -285,7 +368,7 @@ export const api = {
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (status && status !== 'All') params.set('status', status)
-    const res = await fetch(`${BASE_URL}/cases/?${params.toString()}`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/cases?${params.toString()}`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load cases')
     return res.json()
   },
@@ -297,7 +380,7 @@ export const api = {
     purpose?: string
     product_type?: string
   }): Promise<CaseItem> {
-    const res = await fetch(`${BASE_URL}/cases/`, {
+    const res = await apiFetch(`${BASE_URL}/cases`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -315,7 +398,7 @@ export const api = {
     findings: ValidationFinding[]
     decisions: DecisionItem[]
   }> {
-    const res = await fetch(`${BASE_URL}/cases/${caseId}`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/cases/${caseId}`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load case details')
     return res.json()
   },
@@ -323,7 +406,7 @@ export const api = {
   async transitionCase(caseId: string, targetStatus: string, reason?: string): Promise<any> {
     const params = new URLSearchParams({ target_status: targetStatus })
     if (reason) params.set('reason', reason)
-    const res = await fetch(`${BASE_URL}/cases/${caseId}/transition?${params.toString()}`, {
+    const res = await apiFetch(`${BASE_URL}/cases/${caseId}/transition?${params.toString()}`, {
       method: 'POST',
       headers: getHeaders()
     })
@@ -336,8 +419,8 @@ export const api = {
 
   // Evidence
   async getEvidence(caseId?: string): Promise<EvidenceItem[]> {
-    const url = caseId ? `${BASE_URL}/evidence/?case_id=${caseId}` : `${BASE_URL}/evidence/`
-    const res = await fetch(url, { headers: getHeaders() })
+    const url = caseId ? `${BASE_URL}/evidence?case_id=${caseId}` : `${BASE_URL}/evidence`
+    const res = await apiFetch(url, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load evidence')
     return res.json()
   },
@@ -346,7 +429,7 @@ export const api = {
     const formData = new FormData()
     formData.append('file', file)
     if (caseId) formData.append('case_id', caseId)
-    const res = await fetch(`${BASE_URL}/evidence/upload`, {
+    const res = await apiFetch(`${BASE_URL}/evidence/upload`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -371,7 +454,7 @@ export const api = {
     warning_rules: number
     findings: ValidationFinding[]
   }> {
-    const res = await fetch(`${BASE_URL}/validation/run`, {
+    const res = await apiFetch(`${BASE_URL}/validation/run`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ case_id: caseId })
@@ -388,7 +471,7 @@ export const api = {
     interest_rate?: number
     rationale: string
   }): Promise<DecisionItem> {
-    const res = await fetch(`${BASE_URL}/decisions/`, {
+    const res = await apiFetch(`${BASE_URL}/decisions`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -404,7 +487,7 @@ export const api = {
   async getAuditLog(limit = 50, q?: string): Promise<AuditEventItem[]> {
     const params = new URLSearchParams({ limit: String(limit) })
     if (q) params.set('q', q)
-    const res = await fetch(`${BASE_URL}/audit/?${params.toString()}`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/audit?${params.toString()}`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load audit history')
     return res.json()
   },
@@ -414,27 +497,27 @@ export const api = {
     is_valid: boolean
     tampered_count: number
   }> {
-    const res = await fetch(`${BASE_URL}/audit/verify`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/audit/verify`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to verify audit trail')
     return res.json()
   },
 
   // Analytics
   async getAnalytics(): Promise<AnalyticsDashboard> {
-    const res = await fetch(`${BASE_URL}/analytics/dashboard`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/analytics/dashboard`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load analytics')
     return res.json()
   },
 
   // Team
   async getTeam(): Promise<TeamMember[]> {
-    const res = await fetch(`${BASE_URL}/team/`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/team`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load team')
     return res.json()
   },
 
   async inviteMember(data: { email: string; full_name: string; role: string }): Promise<TeamMember> {
-    const res = await fetch(`${BASE_URL}/team/invite`, {
+    const res = await apiFetch(`${BASE_URL}/team/invite`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -448,27 +531,27 @@ export const api = {
 
   // Billing
   async getBilling(): Promise<BillingSummary> {
-    const res = await fetch(`${BASE_URL}/billing/summary`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/billing/summary`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load billing')
     return res.json()
   },
 
   // System
   async getSystemHealth(): Promise<{ status: string; database: string }> {
-    const res = await fetch(`${BASE_URL}/system/health`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/system/health`, { headers: getHeaders() })
     if (!res.ok) throw new Error('System unavailable')
     return res.json()
   },
 
   // Integrations & Environment Settings
   async getIntegrations(): Promise<{ adapters: AdapterStatus[]; environment: string; production_enabled: boolean }> {
-    const res = await fetch(`${BASE_URL}/integrations/`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/integrations/`, { headers: getHeaders() })
     if (!res.ok) throw new Error('Failed to load integrations')
     return res.json()
   },
 
   async updateIntegrationMode(adapterName: string, mode: string): Promise<AdapterStatus> {
-    const res = await fetch(`${BASE_URL}/integrations/${encodeURIComponent(adapterName)}/mode`, {
+    const res = await apiFetch(`${BASE_URL}/integrations/${encodeURIComponent(adapterName)}/mode`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode })
@@ -481,7 +564,7 @@ export const api = {
   },
 
   async simulateIntegrationFailure(adapterName: string, scenario?: string): Promise<AdapterStatus> {
-    const res = await fetch(`${BASE_URL}/integrations/${encodeURIComponent(adapterName)}/simulate-failure`, {
+    const res = await apiFetch(`${BASE_URL}/integrations/${encodeURIComponent(adapterName)}/simulate-failure`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ scenario: scenario || null })
@@ -494,7 +577,7 @@ export const api = {
   },
 
   async testIntegrationConnection(adapterName: string): Promise<{ success: boolean; status: string; latency_ms: number; is_simulated?: boolean; message?: string; error?: string }> {
-    const res = await fetch(`${BASE_URL}/integrations/${encodeURIComponent(adapterName)}/test-connection`, {
+    const res = await apiFetch(`${BASE_URL}/integrations/${encodeURIComponent(adapterName)}/test-connection`, {
       method: 'POST',
       headers: getHeaders()
     })
@@ -506,12 +589,63 @@ export const api = {
   },
 
   // Gold Loan LOS / LMS Operations
+  async getGoldLoanApplications(): Promise<GoldLoanApplicationItem[]> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/applications`, { headers: getHeaders() })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to load gold-loan applications')
+    return res.json()
+  },
+
+  async createGoldLoanApplication(caseId: string, externalCustomerReference?: string, initialCollateral?: { item_type: string; gross_weight_mg: number; stone_deduction_mg: number; purity_bps: number }): Promise<GoldLoanApplicationItem> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/applications`, {
+      method: 'POST', headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case_id: caseId, external_customer_reference: externalCustomerReference || null, initial_collateral: initialCollateral || null }),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to initialize gold-loan workflow')
+    return res.json()
+  },
+
+  async recordGoldLoanConsent(applicationId: string, accepted: boolean): Promise<{ id: string; status: string; created_at: string }> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/applications/${applicationId}/consents`, {
+      method: 'POST', headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purpose: 'Identity and permitted KYC checks', wording_version: 'AURA-DEMO-CONSENT-1', capture_method: 'STAFF_ATTESTATION', accepted }),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to record consent')
+    return res.json()
+  },
+
+  async recordGoldLoanKycSimulation(applicationId: string, result: { pan_status: string; aadhaar_status: string; masked_pan?: string; masked_aadhaar?: string }): Promise<{ status: string; provider_verified: false; is_simulated: true }> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/applications/${applicationId}/kyc-simulation`, {
+      method: 'POST', headers: { ...getHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(result),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to record verification attempt')
+    return res.json()
+  },
+
+  async recordGoldLoanAssaySimulation(applicationId: string, input: { device_id: string; gross_weight_mg: number; purity_bps: number; signature_checked: boolean }): Promise<{ recorded: boolean; is_simulated: true; device_authenticated: false }> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/applications/${applicationId}/assay-simulation`, {
+      method: 'POST', headers: { ...getHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to record simulated assay event')
+    return res.json()
+  },
+
+  async recordGoldLoanValuation(applicationId: string, payload: {
+    items: Array<{ item_type: string; gross_weight_mg: number; stone_deduction_mg: number; purity_bps: number }>;
+    ltv_scheme_pct: number; credit_limit_paise: number; policy_version: string;
+  }): Promise<{ id: string; result: ValuationResponse; policy_version: string; rate_version: string; is_simulated: true; application: GoldLoanApplicationItem }> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/applications/${applicationId}/valuation`, {
+      method: 'POST', headers: { ...getHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to save valuation preview')
+    return res.json()
+  },
+
   async calculateValuation(payload: {
     items: Array<{ item_type: string; gross_weight_mg: number; stone_deduction_mg?: number; purity_bps: number }>;
     ltv_scheme_pct?: number;
     credit_limit_paise?: number;
   }): Promise<ValuationResponse> {
-    const res = await fetch(`${BASE_URL}/gold-loan/valuation/calculate`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/valuation/calculate`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -529,7 +663,7 @@ export const api = {
       gross_weight_mg: String(grossWeightMg),
       purity_bps: String(purityBps)
     })
-    const res = await fetch(`${BASE_URL}/gold-loan/assay/simulate-reading?${params.toString()}`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/assay/simulate-reading?${params.toString()}`, {
       method: 'POST',
       headers: getHeaders()
     })
@@ -541,7 +675,7 @@ export const api = {
   },
 
   async verifyDeviceReading(reading: any): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/assay/verify-reading`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/assay/verify-reading`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(reading)
@@ -554,7 +688,7 @@ export const api = {
   },
 
   async verifyPan(pan: string, customerName: string): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/kyc/verify-pan`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/kyc/verify-pan`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ pan, customer_name: customerName })
@@ -567,7 +701,7 @@ export const api = {
   },
 
   async verifyAadhaar(aadhaarNumber: string, otp: string, consentGiven: boolean): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/kyc/verify-aadhaar`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/kyc/verify-aadhaar`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ aadhaar_number: aadhaarNumber, otp, consent_given: consentGiven })
@@ -580,7 +714,7 @@ export const api = {
   },
 
   async getRepaymentOrders(): Promise<RepaymentOrder[]> {
-    const res = await fetch(`${BASE_URL}/gold-loan/repayments/orders`, { headers: getHeaders() })
+    const res = await apiFetch(`${BASE_URL}/gold-loan/repayments/orders`, { headers: getHeaders() })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.detail || 'Failed to load repayment orders')
@@ -590,7 +724,7 @@ export const api = {
   },
 
   async createRepaymentOrder(loanId: string, amountPaise: number, idempotencyKey: string): Promise<RepaymentOrder> {
-    const res = await fetch(`${BASE_URL}/gold-loan/repayments/create-order`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/repayments/create-order`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ loan_id: loanId, amount_paise: amountPaise, idempotency_key: idempotencyKey })
@@ -603,7 +737,7 @@ export const api = {
   },
 
   async verifyRepaymentPayment(orderId: string, paymentId: string, signature: string): Promise<RepaymentOrder> {
-    const res = await fetch(`${BASE_URL}/gold-loan/repayments/verify-payment`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/repayments/verify-payment`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ order_id: orderId, payment_id: paymentId, signature })
@@ -625,7 +759,7 @@ export const api = {
     checker_id: string;
     idempotency_key: string;
   }): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/disbursals/execute`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/disbursals/execute`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -645,7 +779,7 @@ export const api = {
     item_count: number;
     net_weight_mg: number;
   }): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/vault/seal`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/vault/seal`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -658,7 +792,7 @@ export const api = {
   },
 
   async calculateAccrual(principalPaise: number, annualRatePct: number, days: number): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/servicing/accrue`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/servicing/accrue`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ principal_paise: principalPaise, annual_rate_pct: annualRatePct, days })
@@ -677,7 +811,7 @@ export const api = {
     overdue_interest_paise?: number;
     penal_charges_paise?: number;
   }): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/servicing/allocate-repayment`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/servicing/allocate-repayment`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -695,7 +829,7 @@ export const api = {
     net_gold_weight_mg: number;
     purity_bps?: number;
   }): Promise<any> {
-    const res = await fetch(`${BASE_URL}/gold-loan/collections/evaluate-mtm`, {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/collections/evaluate-mtm`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -703,6 +837,52 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.detail || 'Collateral revaluation preview failed')
+    }
+    return res.json()
+  },
+
+  async getLiveGoldRates(): Promise<AllGoldRates> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/rates/live`)
+    if (!res.ok) throw new Error('Failed to load live gold rates')
+    return res.json()
+  },
+
+  async getLiveGoldRate(karat: '24K' | '22K' | '18K' = '22K'): Promise<GoldRateInfo> {
+    const res = await apiFetch(`${BASE_URL}/gold-loan/rates/live/${karat}`)
+    if (!res.ok) throw new Error('Failed to load gold rate')
+    return res.json()
+  },
+
+  async getWorkspaceSettings(): Promise<{
+    organization_name: string
+    timezone: string
+    default_case_owner: string
+    notification_email: string | null
+    sla_alert_hours: number
+    require_dual_approval: boolean
+    updated_at: string | null
+  }> {
+    const res = await apiFetch(`${BASE_URL}/system/settings`, { headers: getHeaders() })
+    if (!res.ok) throw new Error('Failed to load workspace settings')
+    return res.json()
+  },
+
+  async updateWorkspaceSettings(payload: {
+    organization_name?: string
+    timezone?: string
+    default_case_owner?: string
+    notification_email?: string
+    sla_alert_hours?: number
+    require_dual_approval?: boolean
+  }): Promise<{ ok: boolean; updated_at: string }> {
+    const res = await apiFetch(`${BASE_URL}/system/settings`, {
+      method: 'PUT',
+      headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed to save settings')
     }
     return res.json()
   }
