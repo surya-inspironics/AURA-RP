@@ -7,6 +7,7 @@
     "dev": "next dev",
     "dev:backend": "python backend/run.py",
     "test:backend": "python -m pytest backend/tests -v",
+    "typecheck": "tsc --noEmit",
     "build": "next build",
     "start": "next start"
   },

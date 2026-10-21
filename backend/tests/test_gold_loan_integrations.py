@@ -11,11 +11,29 @@ from backend.app.gold_loan.integrations.registry import adapter_registry
 
 client = TestClient(app)
 
+
+@pytest.fixture(autouse=True)
+def authenticated_default_client(isolated_test_state):
+    from backend.app.core.security import create_access_token
+    from backend.app.database.session import SessionLocal
+    from backend.app.models.entities import Membership, User
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "jordan.davies@northstar.bank").first()
+        membership = db.query(Membership).filter(Membership.user_id == user.id).first()
+        token = create_access_token({"sub": user.id, "tenant_id": membership.tenant_id})
+    finally:
+        db.close()
+    client.headers.update({"Authorization": f"Bearer {token}"})
+
+
 def test_gold_loan_and_integration_routes_require_authentication():
-    assert client.get("/api/v1/integrations/").status_code == 401
+    assert client.get("/api/v1/integrations/", headers={"Authorization": ""}).status_code == 401
     response = client.post(
         "/api/v1/gold-loan/kyc/verify-pan",
-        json={"pan": "ABCDE1234F", "customer_name": "Test User"}
+        json={"pan": "ABCDE1234F", "customer_name": "Test User"},
+        headers={"Authorization": ""},
     )
     assert response.status_code == 401
 
@@ -29,7 +47,7 @@ def test_registry_contains_all_10_adapters():
     assert "Identity & KYC (Aadhaar / PAN / CKYC)" in names
     assert "Credit Bureau (CIBIL / Experian)" in names
     assert "AML / Sanctions / PEP Screening" in names
-    assert "Gold Rate Simulator" in names
+    assert "Gold Rate Feed (Live)" in names
     assert "Gold Assay Device Gateway" in names
     assert "E-Sign & E-Stamp (NeSL / Aadhaar)" in names
     assert "Borrower Notifications (SMS / WhatsApp)" in names
@@ -329,6 +347,8 @@ def test_providerless_financial_flows_reject_production_mode(monkeypatch):
     rates.set_mode(IntegrationMode.PRODUCTION)
     with pytest.raises(RuntimeError, match="no market-data provider"):
         rates.get_gold_rate()
+    with pytest.raises(RuntimeError, match="no market-data provider"):
+        rates.get_all_rates()
 
     bureau = CreditBureauAdapter()
     bureau.set_mode(IntegrationMode.PRODUCTION)

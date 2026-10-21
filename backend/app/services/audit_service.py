@@ -24,12 +24,17 @@ class AuditService:
         now = datetime.now(timezone.utc)
         meta_str = json.dumps(metadata, sort_keys=True)
         
-        # Fetch the most recent audit event for this tenant to get previous hash
-        last_event = db.query(AuditEvent).filter(
+        tenant_events = db.query(AuditEvent).filter(
             AuditEvent.tenant_id == tenant_id
-        ).order_by(AuditEvent.created_at.desc()).first()
-        
-        prev_hash = last_event.current_hash if last_event else GENESIS_HASH
+        ).all()
+        referenced_hashes = {event.prev_hash for event in tenant_events}
+        chain_tails = [
+            event for event in tenant_events
+            if event.current_hash not in referenced_hashes
+        ]
+        if tenant_events and len(chain_tails) != 1:
+            raise ValueError("Cannot append to an audit trail without a unique chain tail")
+        prev_hash = chain_tails[0].current_hash if chain_tails else GENESIS_HASH
         
         # Calculate SHA-256 current hash
         raw_payload = f"{prev_hash}:{tenant_id}:{actor_id or 'anon'}:{action}:{entity_type}:{entity_id}:{now.isoformat()}:{meta_str}"
@@ -60,16 +65,35 @@ class AuditService:
         """
         events = db.query(AuditEvent).filter(
             AuditEvent.tenant_id == tenant_id
-        ).order_by(AuditEvent.created_at.asc()).all()
-        
-        prev_hash = GENESIS_HASH
-        tampered_events = []
-        
+        ).all()
+
+        events_by_previous_hash = {}
         for event in events:
-            if event.prev_hash != prev_hash:
+            events_by_previous_hash.setdefault(event.prev_hash, []).append(event)
+
+        tampered_events = []
+        visited_ids = set()
+        expected_previous_hash = GENESIS_HASH
+
+        while True:
+            candidates = events_by_previous_hash.get(expected_previous_hash, [])
+            if len(candidates) != 1:
+                tampered_events.extend(event.id for event in candidates)
+                break
+
+            event = candidates[0]
+            if event.id in visited_ids:
                 tampered_events.append(event.id)
-            prev_hash = event.current_hash
-            
+                break
+
+            visited_ids.add(event.id)
+            expected_previous_hash = event.current_hash
+
+        tampered_events.extend(
+            event.id for event in events
+            if event.id not in visited_ids and event.id not in tampered_events
+        )
+
         return {
             "total_events": len(events),
             "is_valid": len(tampered_events) == 0,

@@ -8,6 +8,7 @@ from backend.app.database.seed import seed_initial_data
 from backend.app.routers import (
     auth, cases, evidence, validation, decisions, audit, analytics, team, billing, system, integrations, gold_loan
 )
+from backend.app.routers.gold_loan import _public_router as gold_loan_public_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -61,6 +62,7 @@ app.include_router(billing.router, prefix=settings.API_V1_STR)
 app.include_router(system.router, prefix=settings.API_V1_STR)
 app.include_router(integrations.router, prefix=settings.API_V1_STR)
 app.include_router(gold_loan.router, prefix=settings.API_V1_STR)
+app.include_router(gold_loan_public_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

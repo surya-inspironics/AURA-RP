@@ -1,0 +1,63 @@
+version: '3.9'
+
+# AURA Gold Loan Platform – Docker Compose
+# Runs: PostgreSQL + FastAPI backend only.
+# Frontend runs locally: pnpm dev → http://localhost:3000
+#
+# Usage:
+#   docker compose up --build        # start DB + backend
+#   docker compose up -d             # detached
+#   docker compose down              # stop
+#
+# API Docs:   http://localhost:8000/api/v1/docs
+# Live Rates: http://localhost:8000/api/v1/gold-loan/rates/live
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aura
+      POSTGRES_USER: aura
+      POSTGRES_PASSWORD: aura_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aura -d aura"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── FastAPI Backend ─────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://aura:aura_dev_password@db:5432/aura
+      JWT_SECRET: ${JWT_SECRET:-aura_dev_jwt_secret_change_in_prod_2026}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ALLOW_PRODUCTION_INTEGRATIONS: "false"
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_ToA9ypkxb9mArm}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-E49UuutTRzX44YrS3olWlTbr}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-aura_pg_webhook_secret_mock_sandbox_key_2026}
+    ports:
+      - "8000:8000"
+    volumes:
+      - evidence_storage:/app/backend/storage/evidence
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/system/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  evidence_storage:

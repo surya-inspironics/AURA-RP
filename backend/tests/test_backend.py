@@ -1,24 +1,31 @@
 import pytest
 import os
 import io
+from datetime import datetime, timezone
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database.session import Base, engine, SessionLocal
-from backend.app.database.seed import seed_initial_data
-from backend.app.models.entities import Tenant, User, Membership, Case, EvidenceItem
+from backend.app.models.entities import Tenant, User, Membership, Case, EvidenceItem, AuditEvent
 from backend.app.services.audit_service import AuditService
 from backend.app.services.analytics_service import AnalyticsService
 
 client = TestClient(app)
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_database():
-    Base.metadata.create_all(bind=engine)
+
+@pytest.fixture(autouse=True)
+def authenticated_default_client(isolated_test_state):
+    from backend.app.core.security import create_access_token
+
     db = SessionLocal()
-    seed_initial_data(db)
-    db.close()
-    yield
+    try:
+        user = db.query(User).filter(User.email == "jordan.davies@northstar.bank").first()
+        membership = db.query(Membership).filter(Membership.user_id == user.id).first()
+        token = create_access_token({"sub": user.id, "tenant_id": membership.tenant_id})
+    finally:
+        db.close()
+    client.headers.update({"Authorization": f"Bearer {token}"})
+
 
 def test_system_health():
     response = client.get("/api/v1/system/health")
@@ -160,14 +167,30 @@ def test_validation_engine_execution():
     assert "R-TEN-02" in rule_ids
 
 def test_maker_checker_decision():
-    case_res = client.post("/api/v1/cases/", json={
+    maker_login = client.post("/api/v1/auth/login", json={
+        "email": "jordan.davies@northstar.bank",
+        "password": "AuraSecure2026!"
+    })
+    approver_login = client.post("/api/v1/auth/login", json={
+        "email": "alicia.rossi@northstar.bank",
+        "password": "AuraSecure2026!"
+    })
+    assert maker_login.status_code == 200
+    assert approver_login.status_code == 200
+    assert maker_login.json()["user"]["role"] == "owner"
+    assert approver_login.json()["user"]["role"] == "approver"
+    maker_headers = {"Authorization": f"Bearer {maker_login.json()['access_token']}"}
+    approver_headers = {"Authorization": f"Bearer {approver_login.json()['access_token']}"}
+
+    case_res = client.post("/api/v1/cases/", headers=maker_headers, json={
         "customer_name": "Decisions Corp",
         "requested_amount": 200000.0,
         "tenure_months": 12
     })
+    assert case_res.status_code == 201
     case_id = case_res.json()["id"]
 
-    dec_res = client.post("/api/v1/decisions/", json={
+    dec_res = client.post("/api/v1/decisions/", headers=approver_headers, json={
         "case_id": case_id,
         "outcome": "APPROVED",
         "eligible_amount": 200000.0,
@@ -178,14 +201,52 @@ def test_maker_checker_decision():
     assert dec_res.json()["outcome"] == "APPROVED"
 
     # Verify case status updated to APPROVED
-    detail_res = client.get(f"/api/v1/cases/{case_id}")
+    detail_res = client.get(f"/api/v1/cases/{case_id}", headers=approver_headers)
     assert detail_res.json()["case"]["status"] == "APPROVED"
 
+
+def test_test_database_is_disposable_and_separate_from_application_database():
+    from pathlib import Path
+    from backend.app.core.config import settings
+    from backend.app.database.session import engine
+    from conftest import (
+        _APP_DATABASE_URL,
+        _TEMP_ROOT_PATH,
+        _TEST_DATABASE_PATH,
+        _reject_external_test_database_url,
+        _validate_test_database_url,
+    )
+
+    assert engine.url.get_backend_name() == "sqlite"
+    assert Path(engine.url.database).resolve() == _TEST_DATABASE_PATH
+    assert _TEST_DATABASE_PATH.is_relative_to(_TEMP_ROOT_PATH)
+    assert settings.DATABASE_URL != _APP_DATABASE_URL
+    with pytest.raises(RuntimeError, match="disposable SQLite file"):
+        _validate_test_database_url("postgresql://example.invalid/aura", _APP_DATABASE_URL)
+    with pytest.raises(RuntimeError, match="separate from"):
+        _validate_test_database_url(
+            f"sqlite:///{_TEST_DATABASE_PATH.as_posix()}",
+            f"sqlite:///{_TEST_DATABASE_PATH.as_posix()}",
+        )
+    with pytest.raises(RuntimeError, match="managed by pytest"):
+        _reject_external_test_database_url("sqlite:///./aura.db")
+
 def test_tamper_evident_audit_log_integrity():
+    db = SessionLocal()
+    try:
+        events = db.query(AuditEvent).all()
+        assert events
+        same_timestamp = datetime.now(timezone.utc)
+        for event in events:
+            event.created_at = same_timestamp
+        db.commit()
+    finally:
+        db.close()
+
     verify_res = client.get("/api/v1/audit/verify")
     assert verify_res.status_code == 200
     report = verify_res.json()
-    assert report["is_valid"] is True
+    assert report["is_valid"] is True, report
     assert report["tampered_count"] == 0
     assert report["total_events"] > 0
 
